@@ -1,0 +1,53 @@
+<div class="history-page">
+    <div class="history-header">
+        <h1>📊 Histórico de Treinos</h1>
+        <p class="history-subtitle">Total: <strong><%= totalSessions %></strong> treino(s)</p>
+    </div>
+
+    <% if (sessions.length > 0) { %>
+        <!-- Sessions by Plan -->
+        <% Object.entries(sessionsByPlan).forEach(([planName, planSessions]) => { %>
+            <div class="plan-section">
+                <h2 class="plan-title"><%= planName %> (<%= planSessions.length %>)</h2>
+                
+                <div class="sessions-list">
+                    <% planSessions.forEach(session => { %>
+                        <div class="session-card">
+                            <div class="card-header">
+                                <h3><%= new Date(session.completedAt).toLocaleDateString('pt-BR') %></h3>
+                            </div>
+                            
+                            <div class="card-body">
+                                <div class="session-stats">
+                                    <div class="stat">
+                                        <span class="label">⏱️ Duração:</span>
+                                        <span class="value"><%= session.durationMin ? session.durationMin + ' min' : 'N/A' %></span>
+                                    </div>
+                                    <div class="stat">
+                                        <span class="label">✅ Exercícios:</span>
+                                        <span class="value"><%= session.sessionExercises.filter(se => se.isCompleted).length %>/<%= session.sessionExercises.length %></span>
+                                    </div>
+                                    <div class="stat">
+                                        <span class="label">🕐 Hora:</span>
+                                        <span class="value"><%= new Date(session.completedAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) %></span>
+                                    </div>
+                                </div>
+
+                                <% if (session.notes) { %>
+                                    <div class="session-notes">
+                                        <strong>Notas:</strong> <%= session.notes %>
+                                    </div>
+                                <% } %>
+                            </div>
+                        </div>
+                    <% }); %>
+                </div>
+            </div>
+        <% }); %>
+    <% } else { %>
+        <div class="empty-state">
+            <p>Nenhum treino realizado ainda</p>
+            <a href="/workouts" class="btn btn-primary">Começar Treino</a>
+        </div>
+    <% } %>
+</div>

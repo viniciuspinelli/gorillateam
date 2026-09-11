@@ -1,0 +1,150 @@
+<div class="admin-page">
+    <div class="page-header">
+        <div>
+            <a href="/admin/users" class="btn-back">← Voltar</a>
+            <h1>
+                <span class="admin-user-avatar lg"><%= (targetUser.fullName || targetUser.username).charAt(0).toUpperCase() %></span>
+                <%= targetUser.fullName || targetUser.username %>
+                <% if (targetUser.fullName) { %><small style="font-size:0.55em;font-weight:400;color:var(--text-secondary,#888);margin-left:8px;">@<%= targetUser.username %></small><% } %>
+                <span class="admin-user-role <%= targetUser.role === 'admin' ? 'role-admin' : 'role-user' %>">
+                    <%= targetUser.role === 'admin' ? '⚡ Admin' : '👤 Aluno' %>
+                </span>
+            </h1>
+        </div>
+        <a href="/admin/users/<%= targetUser.id %>/edit" class="btn btn-secondary">✏️ Editar</a>
+    </div>
+
+    <div class="admin-detail-grid">
+        <!-- WORKOUTS SECTION -->
+        <div class="admin-detail-section">
+            <div class="admin-section-header">
+                <h2>🏋️ Treinos Atribuídos</h2>
+                <% if (workoutTemplates.length > 0) { %>
+                <button class="btn btn-sm btn-primary" onclick="togglePanel('assign-workout')">➕ Atribuir Treino</button>
+                <% } %>
+            </div>
+
+            <!-- Assign workout panel -->
+            <div id="assign-workout" class="assign-panel" style="display:none">
+                <select id="workoutTemplateSelect">
+                    <option value="">Selecione um template...</option>
+                    <% workoutTemplates.forEach(t => { %>
+                        <option value="<%= t.id %>"><%= t.name %><%= t.dayOfWeek ? ' (' + t.dayOfWeek + ')' : '' %></option>
+                    <% }); %>
+                </select>
+                <button class="btn btn-primary btn-sm" onclick="assignWorkout()">Atribuir</button>
+                <button class="btn btn-secondary btn-sm" onclick="togglePanel('assign-workout')">Cancelar</button>
+            </div>
+
+            <% if (workouts.length > 0) { %>
+                <div class="assigned-plans-list">
+                    <% workouts.forEach(w => { %>
+                        <div class="assigned-plan-row">
+                            <div class="assigned-plan-info">
+                                <span class="assigned-plan-name"><%= w.name %></span>
+                                <% if (w.dayOfWeek) { %><span class="plan-badge"><%= w.dayOfWeek %></span><% } %>
+                            </div>
+                            <button class="btn btn-sm btn-danger" onclick="removePlan('workout', <%= w.id %>)">🗑️</button>
+                        </div>
+                    <% }); %>
+                </div>
+            <% } else { %>
+                <p class="empty-hint">Nenhum treino atribuído ainda.</p>
+            <% } %>
+        </div>
+
+        <!-- DIETS SECTION -->
+        <div class="admin-detail-section">
+            <div class="admin-section-header">
+                <h2>🥗 Dietas Atribuídas</h2>
+                <% if (dietTemplates.length > 0) { %>
+                <button class="btn btn-sm btn-primary" onclick="togglePanel('assign-diet')">➕ Atribuir Dieta</button>
+                <% } %>
+            </div>
+
+            <!-- Assign diet panel -->
+            <div id="assign-diet" class="assign-panel" style="display:none">
+                <select id="dietTemplateSelect">
+                    <option value="">Selecione um template...</option>
+                    <% dietTemplates.forEach(t => { %>
+                        <option value="<%= t.id %>"><%= t.name %></option>
+                    <% }); %>
+                </select>
+                <button class="btn btn-primary btn-sm" onclick="assignDiet()">Atribuir</button>
+                <button class="btn btn-secondary btn-sm" onclick="togglePanel('assign-diet')">Cancelar</button>
+            </div>
+
+            <% if (diets.length > 0) { %>
+                <div class="assigned-plans-list">
+                    <% diets.forEach(d => { %>
+                        <div class="assigned-plan-row">
+                            <div class="assigned-plan-info">
+                                <span class="assigned-plan-name"><%= d.name %></span>
+                                <% if (d.isActive) { %><span class="plan-badge active">Ativa</span><% } %>
+                            </div>
+                            <button class="btn btn-sm btn-danger" onclick="removePlan('diet', <%= d.id %>)">🗑️</button>
+                        </div>
+                    <% }); %>
+                </div>
+            <% } else { %>
+                <p class="empty-hint">Nenhuma dieta atribuída ainda.</p>
+            <% } %>
+        </div>
+    </div>
+
+    <% if (workoutTemplates.length === 0 && dietTemplates.length === 0) { %>
+        <div class="alert alert-info" style="margin-top:20px">
+            📚 Sua biblioteca de templates está vazia. <a href="/admin/templates">Crie templates</a> para poder atribuir aos alunos.
+        </div>
+    <% } %>
+</div>
+
+<script nonce="<%= nonce %>">
+const userId = <%= targetUser.id %>;
+const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+
+function togglePanel(id) {
+    const el = document.getElementById(id);
+    el.style.display = el.style.display === 'none' ? 'flex' : 'none';
+}
+
+async function assignWorkout() {
+    const templateId = document.getElementById('workoutTemplateSelect').value;
+    if (!templateId) return showToast('Selecione um template', 'error');
+    const res = await fetch(`/admin/users/${userId}/assign-workout`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+        body: JSON.stringify({ templateId })
+    });
+    const data = await res.json();
+    if (data.success) { showToast('Treino atribuído!', 'success'); setTimeout(() => location.reload(), 800); }
+    else showToast(data.message || 'Erro', 'error');
+}
+
+async function assignDiet() {
+    const templateId = document.getElementById('dietTemplateSelect').value;
+    if (!templateId) return showToast('Selecione um template', 'error');
+    const res = await fetch(`/admin/users/${userId}/assign-diet`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+        body: JSON.stringify({ templateId })
+    });
+    const data = await res.json();
+    if (data.success) { showToast('Dieta atribuída!', 'success'); setTimeout(() => location.reload(), 800); }
+    else showToast(data.message || 'Erro', 'error');
+}
+
+async function removePlan(type, planId) {
+    if (!confirm('Remover este plano do aluno?')) return;
+    const url = type === 'workout'
+        ? `/admin/users/${userId}/workouts/${planId}`
+        : `/admin/users/${userId}/diets/${planId}`;
+    const res = await fetch(url, {
+        method: 'DELETE',
+        headers: { 'X-CSRF-Token': csrfToken }
+    });
+    const data = await res.json();
+    if (data.success) { showToast('Plano removido', 'success'); setTimeout(() => location.reload(), 800); }
+    else showToast(data.message || 'Erro', 'error');
+}
+</script>

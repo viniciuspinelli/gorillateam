@@ -1,0 +1,59 @@
+# Render Infrastructure as Code Configuration
+# Deploy using: render deploy --config render.yaml
+
+services:
+  - type: web
+    name: gymdiet-app
+    env: docker
+    dockerfilePath: ./Dockerfile
+    
+    # Auto-deploy on push to main branch
+    autoDeployOnPush: true
+    branch: main
+    
+    # Environment variables
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: gymdiet-db
+          property: connectionString
+
+      - key: SESSION_SECRET
+        generateValue: true
+
+      - key: NODE_ENV
+        value: production
+
+      - key: PORT
+        value: 3000
+
+    # Build configuration (migrations run on app startup now)
+    buildCommand: npm install
+
+    # Start command (will auto-run migrations and seed)
+    startCommand: npm run start
+
+    # Health endpoint (optional but recommended)
+    healthCheckPath: /health
+
+    # Timeout for deployment
+    buildFailureStrategy: cancel
+
+    # Scaling configuration
+    scaling:
+      minInstances: 1
+      maxInstances: 3
+
+    # Region (optional - defaults to Oregon)
+    # region: oregon
+
+# Database Configuration
+databases:
+  - name: gymdiet-db
+    databaseName: gymdb
+    plan: free
+    version: 15
+    
+    # Optionally restore from backup
+    # restoreFrom: backup-id
+

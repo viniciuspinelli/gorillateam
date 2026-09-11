@@ -1,0 +1,70 @@
+<div class="admin-page">
+    <div class="page-header">
+        <div>
+            <h1><% if (isAdmin) { %>👥 Gerenciar Alunos<% } else { %>👥 Meus Alunos<% } %></h1>
+            <p class="page-subtitle"><%= users.length %> aluno(s) cadastrado(s)</p>
+        </div>
+        <a href="/admin/users/new" class="btn btn-primary">➕ Novo Aluno</a>
+    </div>
+
+    <div class="admin-users-list">
+        <% users.forEach(u => { %>
+            <div class="admin-user-row">
+                <div class="admin-user-info">
+                    <span class="admin-user-avatar"><%= u.username.charAt(0).toUpperCase() %></span>
+                    <div>
+                        <span class="admin-user-name">
+                            <%= u.fullName || u.username %>
+                            <% if (u.fullName) { %><small style="font-weight:400;color:var(--text-secondary, #888);margin-left:6px;">@<%= u.username %></small><% } %>
+                        </span>
+                        <span class="admin-user-role <%= u.role === 'admin' ? 'role-admin' : (u.role === 'instructor' ? 'role-instructor' : 'role-user') %>">
+                            <%= u.role === 'admin' ? '⚡ Admin' : (u.role === 'instructor' ? '🎓 Instrutor' : '👤 Aluno') %>
+                        </span>
+                        <% if (isAdmin && u.instructorUsername) { %>
+                            <span class="admin-user-role" style="background:var(--surface-elevated,#222);color:var(--text-secondary,#aaa);font-size:0.72rem;margin-left:4px;">📋 <%= u.instructorFullName || u.instructorUsername %></span>
+                        <% } %>
+                    </div>
+                </div>
+                <div class="admin-user-actions">
+                    <% if (u.role === 'user') { %>
+                    <a href="/admin/users/<%= u.id %>" class="btn btn-sm btn-secondary">Ver Planos</a>
+                    <% } %>
+                    <a href="/admin/users/<%= u.id %>/edit" class="btn btn-sm btn-secondary">✏️ Editar</a>
+                    <% if (u.id !== user.id) { %>
+                        <button class="btn btn-sm btn-danger js-delete-user" data-id="<%= u.id %>" data-username="<%= u.username %>">🗑️</button>
+                    <% } %>
+                </div>
+            </div>
+        <% }); %>
+
+        <% if (users.length === 0) { %>
+            <div class="empty-state">
+                <p>Nenhum aluno cadastrado ainda.</p>
+                <a href="/admin/users/new" class="btn btn-primary">Criar primeiro aluno</a>
+            </div>
+        <% } %>
+    </div>
+</div>
+
+<script nonce="<%= nonce %>">
+document.querySelectorAll('.js-delete-user').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+        const id = this.dataset.id;
+        const username = this.dataset.username;
+        if (!confirm(`Deletar o usuário "${username}"? Todos os dados serão removidos.`)) return;
+        fetch(`/admin/users/${id}`, {
+            method: 'DELETE',
+            headers: { 'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').content }
+        })
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+            if (data.success) {
+                showToast(`Usuário ${username} removido`, 'success');
+                setTimeout(function() { location.reload(); }, 800);
+            } else {
+                showToast(data.message || 'Erro ao deletar', 'error');
+            }
+        });
+    });
+});
+</script>

@@ -1,0 +1,244 @@
+<div class="active-workout-page">
+    <!-- Workout Header -->
+    <div class="workout-header">
+        <h1><%= session.workoutPlan.name %></h1>
+        <a href="/workouts" class="btn-back">← Voltar</a>
+    </div>
+
+    <!-- Progress -->
+    <div class="workout-controls">
+        <div class="progress-bar-container">
+            <div class="progress-label">
+                <span id="progressText"><%= completedCount %>/<%= totalCount %> exercícios</span>
+            </div>
+            <div class="progress-bar">
+                <div id="progressFill" class="progress-fill" style="width: <%= totalCount > 0 ? (completedCount / totalCount * 100) : 0 %>%"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Exercises List -->
+    <div class="exercises-list">
+        <% session.sessionExercises.forEach((sessionExercise, index) => { %>
+            <div class="exercise-item <%= sessionExercise.isCompleted ? 'completed' : '' %>"
+                 data-exercise-id="<%= sessionExercise.id %>">
+                
+                <div class="exercise-header">
+                    <div class="exercise-number">
+                        <span class="number"><%= index + 1 %></span>
+                    </div>
+                    <div class="exercise-info">
+                        <h3><%= sessionExercise.exercise.name %></h3>
+                        <div class="exercise-meta">
+                            <span class="meta-item">
+                                <strong><%= sessionExercise.exercise.sets %>x<%= sessionExercise.exercise.reps %></strong>
+                            </span>
+                            <% if (sessionExercise.exercise.weight) { %>
+                                <span class="meta-item">
+                                    <strong><%= sessionExercise.exercise.weight %></strong>
+                                </span>
+                            <% } %>
+                            <% if (sessionExercise.exercise.restSeconds) { %>
+                                <span class="meta-item">
+                                    🕐 <%= sessionExercise.exercise.restSeconds %>s descanso
+                                </span>
+                            <% } %>
+                        </div>
+                        <% if (sessionExercise.exercise.notes) { %>
+                            <p class="exercise-notes"><%= sessionExercise.exercise.notes %></p>
+                        <% } %>
+                        <% if (sessionExercise.exercise.images && sessionExercise.exercise.images.length > 0) { %>
+                            <div class="exercise-media-actions" style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
+                                <button
+                                    type="button"
+                                    class="btn btn-secondary btn-sm btn-open-images"
+                                    data-images="<%- JSON.stringify(sessionExercise.exercise.images).replace(/"/g, '&quot;') %>">
+                                    📷 Ver foto<%= sessionExercise.exercise.images.length > 1 ? 's' : '' %>
+                                </button>
+                            </div>
+                        <% } %>
+                    </div>
+                    <button class="btn-complete" data-session-id="<%= session.id %>" data-exercise-id="<%= sessionExercise.id %>">
+                        <span class="check-icon">✓</span>
+                        <span class="check-text">Concluído</span>
+                    </button>
+                </div>
+            </div>
+        <% }); %>
+    </div>
+
+    <!-- Complete Workout Button -->
+    <div class="complete-section" style="display: none;" id="completeSection">
+        <button id="completeWorkoutBtn" class="btn btn-success btn-lg">
+            🏁 Finalizar Treino
+        </button>
+    </div>
+
+    <div id="exerciseImageModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:9999;padding:24px;align-items:center;justify-content:center;">
+        <div style="position:relative;max-width:900px;width:100%;max-height:100%;display:flex;flex-direction:column;gap:12px;">
+            <button type="button" id="closeExerciseImageModal" class="btn btn-secondary btn-sm" style="align-self:flex-end;">Fechar</button>
+            <div style="background:#111;border-radius:14px;padding:12px;display:flex;align-items:center;justify-content:center;min-height:240px;">
+                <img id="exerciseImageModalPreview" src="" alt="Imagem do exercício" style="max-width:100%;max-height:65vh;border-radius:10px;object-fit:contain;display:none;">
+            </div>
+            <div id="exerciseImageModalThumbs" style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;"></div>
+        </div>
+    </div>
+</div>
+
+<script nonce="<%= nonce %>">
+    const sessionId = '<%= session.id %>';
+    const csrfToken = '<%= csrfToken %>';
+    const totalExercises = <%= totalCount %>;
+    let completedCount = <%= completedCount %>;
+    const imageModal = document.getElementById('exerciseImageModal');
+    const imageModalPreview = document.getElementById('exerciseImageModalPreview');
+    const imageModalThumbs = document.getElementById('exerciseImageModalThumbs');
+
+    // Show complete button if already all done on load
+    if (completedCount === totalExercises && totalExercises > 0) {
+        document.getElementById('completeSection').style.display = 'block';
+    }
+
+    // Complete Exercise
+    document.querySelectorAll('.btn-complete').forEach(btn => {
+        // If already completed, disable button on load
+        const exerciseItem = document.querySelector(`[data-exercise-id="${btn.dataset.exerciseId}"]`);
+        if (exerciseItem && exerciseItem.classList.contains('completed')) {
+            btn.disabled = true;
+        }
+
+        btn.addEventListener('click', async function() {
+            const sessionId = this.dataset.sessionId;
+            const exerciseId = this.dataset.exerciseId;
+            const exerciseItem = document.querySelector(`[data-exercise-id="${exerciseId}"]`);
+
+            try {
+                this.disabled = true;
+
+                const response = await fetch(`/workouts/session/${sessionId}/exercise/${exerciseId}/complete`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-Token': csrfToken
+                    }
+                });
+
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+                const data = await response.json();
+
+                if (data.success) {
+                    exerciseItem.classList.add('completed');
+                    completedCount++;
+                    document.getElementById('progressText').textContent = `${completedCount}/${totalExercises} exercícios`;
+                    document.getElementById('progressFill').style.width = `${(completedCount / totalExercises) * 100}%`;
+
+                    // Auto-finish when all exercises done
+                    if (completedCount === totalExercises) {
+                        showToast('Todos os exercícios concluídos! Finalizando treino... 🎉', 'success');
+                        await finishWorkout();
+                    } else {
+                        showToast('Exercício concluído! ✓', 'success');
+                    }
+                } else {
+                    throw new Error(data.message || 'Erro desconhecido');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showToast('Erro: ' + error.message, 'error');
+                this.disabled = false;
+            }
+        });
+    });
+
+    async function finishWorkout() {
+        try {
+            const response = await fetch(`/workouts/session/${sessionId}/complete`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': csrfToken
+                },
+                body: JSON.stringify({ durationMin: 0 })
+            });
+
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+            const data = await response.json();
+
+            if (data.success) {
+                setTimeout(() => window.location.href = '/workouts', 1800);
+            } else {
+                throw new Error(data.message || 'Erro ao finalizar');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            showToast('Erro ao finalizar: ' + error.message, 'error');
+            // Show manual button as fallback
+            document.getElementById('completeSection').style.display = 'block';
+        }
+    }
+
+    // Manual complete button (fallback)
+    document.getElementById('completeWorkoutBtn')?.addEventListener('click', async function() {
+        this.disabled = true;
+        await finishWorkout();
+    });
+
+    function openExerciseImageModal(images) {
+        if (!Array.isArray(images) || images.length === 0) {
+            return;
+        }
+
+        imageModal.style.display = 'flex';
+        renderExerciseImageGallery(images, 0);
+    }
+
+    function renderExerciseImageGallery(images, activeIndex) {
+        const current = images[activeIndex];
+        if (!current) {
+            return;
+        }
+
+        imageModalPreview.src = current.publicUrl;
+        imageModalPreview.alt = current.fileName || 'Imagem do exercício';
+        imageModalPreview.style.display = 'block';
+
+        imageModalThumbs.innerHTML = images.map((image, index) => {
+            const activeStyle = index === activeIndex
+                ? 'border:2px solid #ff6b00;opacity:1;'
+                : 'border:2px solid transparent;opacity:.75;';
+
+            return `<button type="button" class="btn-thumb-image" data-index="${index}" style="padding:0;border-radius:8px;overflow:hidden;background:transparent;${activeStyle}">
+                <img src="${image.publicUrl}" alt="${image.fileName || 'Imagem'}" style="width:72px;height:72px;object-fit:cover;display:block;">
+            </button>`;
+        }).join('');
+
+        imageModalThumbs.querySelectorAll('.btn-thumb-image').forEach((button) => {
+            button.addEventListener('click', () => {
+                renderExerciseImageGallery(images, Number(button.dataset.index));
+            });
+        });
+    }
+
+    document.querySelectorAll('.btn-open-images').forEach((button) => {
+        button.addEventListener('click', () => {
+            const images = JSON.parse(button.dataset.images || '[]');
+            openExerciseImageModal(images);
+        });
+    });
+
+    document.getElementById('closeExerciseImageModal')?.addEventListener('click', () => {
+        imageModal.style.display = 'none';
+        imageModalPreview.src = '';
+        imageModalThumbs.innerHTML = '';
+    });
+
+    imageModal?.addEventListener('click', (event) => {
+        if (event.target === imageModal) {
+            imageModal.style.display = 'none';
+            imageModalPreview.src = '';
+            imageModalThumbs.innerHTML = '';
+        }
+    });
+</script>

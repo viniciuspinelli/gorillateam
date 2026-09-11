@@ -1,0 +1,116 @@
+<div class="error-page">
+    <div class="error-content">
+        <h1 class="error-code"><%= error.status || 500 %></h1>
+        <h2 class="error-title">Oops! Algo deu errado</h2>
+        <p class="error-message"><%= message %></p>
+        
+        <% if (Object.keys(error).length > 0 && error.status !== 404) { %>
+            <details class="error-details">
+                <summary>Detalhes técnicos</summary>
+                <pre><code><%= JSON.stringify(error, null, 2) %></code></pre>
+            </details>
+        <% } %>
+
+        <div class="error-actions">
+            <a href="/workouts" class="btn btn-primary">Voltar para Treinos</a>
+            <a href="/" class="btn btn-secondary">Ir para Início</a>
+        </div>
+    </div>
+</div>
+
+<style>
+    .error-page {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+        padding: 20px;
+        background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    }
+
+    .error-content {
+        text-align: center;
+        background: rgba(15, 23, 42, 0.8);
+        border: 1px solid rgba(148, 163, 184, 0.2);
+        border-radius: 12px;
+        padding: 40px;
+        max-width: 500px;
+    }
+
+    .error-code {
+        font-size: 72px;
+        font-weight: bold;
+        color: #22c55e;
+        margin: 0;
+    }
+
+    .error-title {
+        font-size: 28px;
+        color: #e2e8f0;
+        margin: 10px 0;
+    }
+
+    .error-message {
+        color: #cbd5e1;
+        font-size: 16px;
+        margin: 20px 0;
+    }
+
+    .error-details {
+        margin: 20px 0;
+        text-align: left;
+    }
+
+    .error-details summary {
+        cursor: pointer;
+        color: #94a3b8;
+        font-size: 14px;
+    }
+
+    .error-details pre {
+        background: rgba(30, 41, 59, 0.5);
+        padding: 12px;
+        border-radius: 6px;
+        overflow-x: auto;
+        color: #22c55e;
+        font-size: 12px;
+        margin-top: 10px;
+    }
+
+    .error-actions {
+        display: flex;
+        gap: 10px;
+        justify-content: center;
+        margin-top: 30px;
+        flex-wrap: wrap;
+    }
+
+    .btn {
+        padding: 10px 20px;
+        border-radius: 6px;
+        text-decoration: none;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        border: none;
+        cursor: pointer;
+    }
+
+    .btn-primary {
+        background: #22c55e;
+        color: #0f172a;
+    }
+
+    .btn-primary:hover {
+        background: #16a34a;
+    }
+
+    .btn-secondary {
+        background: rgba(148, 163, 184, 0.2);
+        color: #e2e8f0;
+        border: 1px solid rgba(148, 163, 184, 0.3);
+    }
+
+    .btn-secondary:hover {
+        background: rgba(148, 163, 184, 0.3);
+    }
+</style>

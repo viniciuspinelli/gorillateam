@@ -1,0 +1,515 @@
+<meta name="csrf-token" content="<%= csrfToken %>">
+
+<div class="plans-page">
+
+    <div class="page-header">
+        <div>
+            <h1>Planos de Treino</h1>
+            <p class="page-subtitle">Gerencie seus planos e exercicios</p>
+        </div>
+        <% if (isAdmin) { %>
+        <button class="btn btn-primary" id="btn-novo-plano" onclick="toggleCreatePanel()">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Novo Plano
+        </button>
+        <% } %>
+    </div>
+
+    <!-- Inline: Criar Plano -->
+    <% if (isAdmin) { %>
+    <div class="inline-panel" id="panel-create">
+        <div class="inline-panel-header">
+            <span class="inline-panel-title">Novo Plano</span>
+            <button class="modal-close" onclick="toggleCreatePanel()" title="Fechar">&times;</button>
+        </div>
+        <form onsubmit="submitCreate(event)" class="inline-panel-form">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <div class="form-group">
+                <label>Nome *</label>
+                <input type="text" id="c-name" name="name" placeholder="ex: Peito e Costas" required>
+            </div>
+            <div class="form-group">
+                <label>Descricao</label>
+                <textarea id="c-desc" name="description" rows="2" placeholder="Objetivo do plano..."></textarea>
+            </div>
+            <div class="inline-panel-actions">
+                <button type="submit" class="btn btn-primary" id="btn-create">Criar Plano</button>
+                <button type="button" class="btn btn-secondary" onclick="toggleCreatePanel()">Cancelar</button>
+            </div>
+        </form>
+    </div>
+    <% } %>
+
+    <!-- Lista de Planos -->
+    <% if (plans.length > 0) { %>
+        <div class="plans-simple-list" id="plans-list">
+            <% plans.forEach(plan => { %>
+                <div class="plan-card" id="plan-card-<%= plan.id %>">
+                    <div class="plan-row" id="plan-row-<%= plan.id %>">
+                        <div class="plan-row-info">
+                            <span class="plan-row-name"><%= plan.name %></span>
+                            <div class="plan-row-meta">
+                                <% if (plan.dayOfWeek) { %><span class="day-badge"><%= plan.dayOfWeek %></span><% } %>
+                                <span class="badge-count"><%= plan.exercise_count %> exerc.</span>
+                                <% if (!plan.isActive) { %><span class="badge badge-warning">Inativo</span><% } %>
+                            </div>
+                        </div>
+                        <div class="plan-row-actions">
+                            <% if (typeof isAdmin !== 'undefined' && isAdmin) { %>
+                            <button class="btn btn-sm <%= plan.isTemplate ? 'btn-primary' : 'btn-secondary' %>" 
+                                    onclick="toggleTemplate(<%= plan.id %>, this)" 
+                                    title="<%= plan.isTemplate ? 'Remover da Biblioteca' : 'Mover para Biblioteca' %>">
+                                <%= plan.isTemplate ? '📚 Biblioteca' : '📋 Tornar Template' %>
+                            </button>
+                            <% } %>
+                            <button class="btn btn-secondary btn-sm" id="btn-edit-<%= plan.id %>" onclick="toggleExercises(<%= plan.id %>, '<%= plan.name.replace(/\'/g, `\\'`) %>')">
+                                Editar
+                            </button>
+                            <button class="btn btn-danger btn-sm" onclick="deletePlan(<%= plan.id %>, '<%= plan.name.replace(/\'/g, `\\'`) %>')">
+                                Deletar
+                            </button>
+                        </div>
+                    </div>
+                    <!-- Exercises Panel (inline, oculto por padrao) -->
+                    <div class="plan-exercises-panel" id="ex-panel-<%= plan.id %>">
+                        <div class="exercises-panel-header">
+                            <span class="exercises-section-label">EXERCICIOS</span>
+                            <button class="btn-icon" onclick="toggleExercises(<%= plan.id %>)" title="Fechar painel">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                            </button>
+                        </div>
+                        <div id="ex-list-<%= plan.id %>"></div>
+
+                        <!-- Adicionar exercicio inline -->
+                        <div class="add-exercise-details" id="add-details-<%= plan.id %>">
+                            <button class="add-exercise-summary" type="button" onclick="toggleAddEx(<%= plan.id %>)">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                                Adicionar Exercicio
+                            </button>
+                            <div class="add-exercise-body" id="add-form-<%= plan.id %>" style="display:none">
+                                <form onsubmit="submitAddEx(event, <%= plan.id %>)">
+                                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                                    <div class="form-grid-3">
+                                        <div class="form-group">
+                                            <label>Nome *</label>
+                                            <input type="text" name="name" placeholder="ex: Supino" required>
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Series *</label>
+                                            <input type="number" name="sets" placeholder="4" min="1" max="20" required>
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Reps *</label>
+                                            <input type="text" name="reps" placeholder="8-12" required>
+                                        </div>
+                                    </div>
+                                    <div class="form-grid-3">
+                                        <div class="form-group">
+                                            <label>Carga</label>
+                                            <input type="text" name="weight" placeholder="60kg">
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Descanso (seg)</label>
+                                            <input type="number" name="restSeconds" placeholder="60" min="0">
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Notas</label>
+                                            <input type="text" name="notes" placeholder="Dicas...">
+                                        </div>
+                                    </div>
+                                    <div class="form-grid-3">
+                                        <div class="form-group">
+                                            <label>Foto pela camera</label>
+                                            <input type="file" name="cameraImage" accept="image/*" capture="environment">
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Imagem da galeria</label>
+                                            <input type="file" name="galleryImage" accept="image/*">
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Dica</label>
+                                            <input type="text" value="Opcional: tire ou anexe uma imagem agora" readonly>
+                                        </div>
+                                    </div>
+                                    <div class="inline-edit-actions">
+                                        <button type="submit" class="btn btn-primary btn-sm">Adicionar</button>
+                                        <button type="button" class="btn btn-secondary btn-sm" onclick="toggleAddEx(<%= plan.id %>)">Cancelar</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            <% }); %>
+        </div>
+    <% } else { %>
+        <div class="empty-state" id="empty-state">
+            <span class="empty-state-icon">&#127947;</span>
+            <p>Nenhum plano criado ainda</p>
+            <small>Crie seu primeiro plano de treino</small>
+            <button class="btn btn-primary" onclick="toggleCreatePanel()">Criar Plano</button>
+        </div>
+    <% } %>
+
+</div>
+
+<script nonce="<%= nonce %>">
+const _csrf = document.querySelector('meta[name="csrf-token"]').content;
+
+// --- Toast ---
+function toast(msg, type = 'info') {
+    let c = document.querySelector('.toast-container');
+    if (!c) { c = document.createElement('div'); c.className = 'toast-container'; document.body.appendChild(c); }
+    const t = document.createElement('div');
+    t.className = 'toast toast-' + type;
+    t.textContent = msg;
+    c.appendChild(t);
+    requestAnimationFrame(() => t.classList.add('show'));
+    setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 400); }, 3500);
+}
+
+// --- Criar Plano (inline panel) ---
+function toggleCreatePanel() {
+    const panel = document.getElementById('panel-create');
+    const isOpen = panel.classList.toggle('open');
+    if (isOpen) {
+        panel.querySelector('form').reset();
+        document.getElementById('c-name').focus();
+    }
+}
+
+async function submitCreate(e) {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const btn = document.getElementById('btn-create');
+    btn.disabled = true; btn.textContent = 'Criando...';
+    try {
+        const r = await fetch('/workouts/plans', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': _csrf },
+            body: JSON.stringify({ name: fd.get('name'), description: fd.get('description') || null })
+        });
+        const d = await r.json();
+        if (d.success) { toast('Plano criado!', 'success'); setTimeout(() => location.reload(), 1200); }
+        else toast(d.message || 'Erro', 'error');
+    } catch(_) { toast('Erro de conexao', 'error'); }
+    finally { btn.disabled = false; btn.textContent = 'Criar Plano'; }
+}
+
+// --- Painel de Exercicios (inline accordion) ---
+let _openPanelId = null;
+
+function toggleExercises(planId, name) {
+    const panel = document.getElementById('ex-panel-' + planId);
+    const editBtn = document.getElementById('btn-edit-' + planId);
+
+    // Fechar painel anterior se diferente
+    if (_openPanelId && _openPanelId !== planId) {
+        const prev = document.getElementById('ex-panel-' + _openPanelId);
+        const prevBtn = document.getElementById('btn-edit-' + _openPanelId);
+        if (prev) prev.classList.remove('open');
+        if (prevBtn) prevBtn.textContent = 'Editar';
+        _openPanelId = null;
+    }
+
+    const isOpen = panel.classList.toggle('open');
+    if (isOpen) {
+        editBtn.textContent = 'Fechar';
+        _openPanelId = planId;
+        loadExercises(planId);
+    } else {
+        editBtn.textContent = 'Editar';
+        _openPanelId = null;
+    }
+}
+
+// --- Deletar Plano ---
+async function deletePlan(id, name) {
+    if (!confirm('Deletar "' + name + '"? Os exercicios serao removidos.')) return;
+    try {
+        const r = await fetch('/workouts/plans/' + id, { method: 'DELETE', headers: { 'X-CSRF-Token': _csrf } });
+        const d = await r.json();
+        if (d.success) { toast('Plano deletado!', 'success'); setTimeout(() => location.reload(), 1000); }
+        else toast(d.message || 'Erro', 'error');
+    } catch(_) { toast('Erro de conexao', 'error'); }
+}
+
+async function toggleTemplate(id, btn) {
+    try {
+        const r = await fetch('/workouts/plans/' + id + '/toggle-template', { method: 'PATCH', headers: { 'X-CSRF-Token': _csrf } });
+        const d = await r.json();
+        if (d.success) {
+            if (d.isTemplate) {
+                btn.textContent = '📚 Biblioteca';
+                btn.classList.remove('btn-secondary');
+                btn.classList.add('btn-primary');
+                toast('Plano movido para a biblioteca!', 'success');
+            } else {
+                btn.textContent = '📋 Tornar Template';
+                btn.classList.remove('btn-primary');
+                btn.classList.add('btn-secondary');
+                toast('Plano removido da biblioteca', 'success');
+            }
+        } else toast(d.message || 'Erro', 'error');
+    } catch(_) { toast('Erro de conexao', 'error'); }
+}
+
+// --- Listar Exercicios ---
+async function loadExercises(planId) {
+    const list = document.getElementById('ex-list-' + planId);
+    list.innerHTML = '<p class="exercises-loading">Carregando...</p>';
+    try {
+        const r = await fetch('/workouts/plans/' + planId + '/exercises');
+        const d = await r.json();
+        if (!d.success || d.exercises.length === 0) {
+            list.innerHTML = '<p class="no-exercises-msg">Nenhum exercicio ainda</p>';
+            return;
+        }
+        list.innerHTML = d.exercises.map(function(ex, i) {
+            return '<div class="exercise-row" id="exrow-' + ex.id + '">' +
+                '<div class="exercise-row-number">' + (i+1) + '</div>' +
+                '<div class="exercise-row-info">' +
+                    '<span class="exercise-row-name">' + ex.name + '</span>' +
+                    '<div class="exercise-row-meta">' +
+                        '<span class="meta-pill">' + ex.sets + 'x' + ex.reps + '</span>' +
+                        (ex.weight ? '<span class="meta-pill">' + ex.weight + '</span>' : '') +
+                        (ex.restSeconds ? '<span class="meta-pill">' + ex.restSeconds + 's</span>' : '') +
+                        (ex.notes ? '<span class="meta-pill meta-notes">' + ex.notes + '</span>' : '') +
+                    '</div>' +
+                '</div>' +
+                '<div class="exercise-row-actions">' +
+                    '<button class="btn-icon" onclick="uploadExImage(' + ex.id + ',' + planId + ', true)" title="Tirar foto">' +
+                        '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>' +
+                    '</button>' +
+                    '<button class="btn-icon" onclick="uploadExImage(' + ex.id + ',' + planId + ', false)" title="Anexar imagem">' +
+                        '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>' +
+                    '</button>' +
+                    '<button class="btn-icon" onclick="showExEditForm(' + ex.id + ',' + planId + ',\'' + esc(ex.name) + '\',' + ex.sets + ',\'' + esc(ex.reps) + '\',\'' + esc(ex.weight||'') + '\',' + (ex.restSeconds||0) + ',\'' + esc(ex.notes||'') + '\')" title="Editar">' +
+                        '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>' +
+                    '</button>' +
+                    '<button class="btn-icon btn-icon-danger" onclick="deleteEx(' + ex.id + ',' + planId + ',\'' + esc(ex.name) + '\')" title="Deletar">' +
+                        '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>' +
+                    '</button>' +
+                '</div>' +
+            '</div>' +
+            '<div id="eximg-' + ex.id + '" style="display:flex;flex-wrap:wrap;gap:8px;padding:8px 0 2px 42px;"></div>';
+        }).join('');
+
+        d.exercises.forEach(function(ex) {
+            loadExerciseImages(ex.id);
+        });
+    } catch(_) { list.innerHTML = '<p class="error-msg">Erro ao carregar</p>'; }
+}
+
+function esc(s) { return String(s||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'"); }
+function escHtml(s) { return String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// --- Upload de Imagem de Exercicio ---
+function uploadExImage(exerciseId, planId, useCamera) {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    if (useCamera) {
+        input.setAttribute('capture', 'environment');
+    }
+    input.onchange = async function () {
+        const file = input.files && input.files[0];
+        if (!file) return;
+
+        const fd = new FormData();
+        fd.append('image', file);
+
+        try {
+            const r = await fetch('/workouts/exercises/' + exerciseId + '/images', {
+                method: 'POST',
+                headers: { 'X-CSRF-Token': _csrf, 'Accept': 'application/json' },
+                body: fd,
+            });
+
+            const d = await r.json().catch(function () {
+                return { success: false, message: 'Falha ao interpretar resposta do upload.' };
+            });
+            if (d.success) {
+                toast('Imagem enviada com sucesso!', 'success');
+                loadExerciseImages(exerciseId);
+            } else {
+                toast(d.message || 'Falha no upload da imagem', 'error');
+            }
+        } catch (_) {
+            toast('Erro de conexao no upload', 'error');
+        }
+    };
+    input.click();
+}
+
+function fmtSize(bytes) {
+    if (!bytes && bytes !== 0) return '';
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+async function loadExerciseImages(exerciseId) {
+    const box = document.getElementById('eximg-' + exerciseId);
+    if (!box) return;
+
+    try {
+        const r = await fetch('/workouts/exercises/' + exerciseId + '/images');
+        const d = await r.json();
+
+        if (!d.success || !d.images || d.images.length === 0) {
+            box.innerHTML = '';
+            return;
+        }
+
+        box.innerHTML = d.images.map(function(img) {
+            const name = escHtml(img.fileName || 'imagem');
+            const size = fmtSize(img.sizeBytes);
+            return '<div style="border:1px solid rgba(255,255,255,0.14);border-radius:8px;padding:6px;background:rgba(255,255,255,0.02);width:122px;">' +
+                '<img src="' + escHtml(img.publicUrl) + '" alt="' + name + '" style="width:108px;height:78px;object-fit:cover;border-radius:6px;display:block;margin:0 auto 6px;">' +
+                '<div style="font-size:10px;line-height:1.25;min-height:24px;word-break:break-word;">' + name + '</div>' +
+                '<div style="display:flex;justify-content:space-between;align-items:center;font-size:10px;opacity:.8;margin-top:4px;">' +
+                    '<span>' + size + '</span>' +
+                    '<button class="btn-icon btn-icon-danger" onclick="deleteExImage(' + exerciseId + ',' + img.id + ')" title="Excluir imagem">' +
+                        '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>' +
+                    '</button>' +
+                '</div>' +
+            '</div>';
+        }).join('');
+    } catch (_) {
+        box.innerHTML = '';
+    }
+}
+
+async function deleteExImage(exerciseId, imageId) {
+    if (!confirm('Excluir esta imagem?')) return;
+    try {
+        const r = await fetch('/workouts/exercises/' + exerciseId + '/images/' + imageId, {
+            method: 'DELETE',
+            headers: { 'X-CSRF-Token': _csrf, 'Accept': 'application/json' }
+        });
+        const d = await r.json();
+        if (d.success) {
+            toast('Imagem removida!', 'success');
+            loadExerciseImages(exerciseId);
+        } else {
+            toast(d.message || 'Falha ao remover imagem', 'error');
+        }
+    } catch (_) {
+        toast('Erro ao remover imagem', 'error');
+    }
+}
+
+// --- Editar Exercicio (inline) ---
+function showExEditForm(id, planId, name, sets, reps, weight, rest, notes) {
+    const row = document.getElementById('exrow-' + id);
+    row.innerHTML =
+        '<form class="exercise-inline-edit" onsubmit="saveExInline(event,' + id + ',' + planId + ')">' +
+            '<div class="inline-edit-grid">' +
+                '<input class="inline-input inline-input-wide" type="text" name="name" value="' + escHtml(name) + '" placeholder="Nome" required>' +
+                '<input class="inline-input" type="number" name="sets" value="' + sets + '" min="1" max="20" placeholder="Series" required>' +
+                '<input class="inline-input" type="text" name="reps" value="' + escHtml(reps) + '" placeholder="Reps" required>' +
+                '<input class="inline-input" type="text" name="weight" value="' + escHtml(weight) + '" placeholder="Carga">' +
+                '<input class="inline-input" type="number" name="restSeconds" value="' + (rest||'') + '" placeholder="Desc(s)">' +
+                '<input class="inline-input inline-input-wide" type="text" name="notes" value="' + escHtml(notes) + '" placeholder="Notas">' +
+            '</div>' +
+            '<div class="inline-edit-actions">' +
+                '<button type="submit" class="btn btn-primary btn-sm">Salvar</button>' +
+                '<button type="button" class="btn btn-secondary btn-sm" onclick="loadExercises(' + planId + ')">Cancelar</button>' +
+            '</div>' +
+        '</form>';
+    row.querySelector('[name="name"]').focus();
+}
+
+async function saveExInline(e, id, planId) {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const btn = e.target.querySelector('[type="submit"]');
+    btn.disabled = true; btn.textContent = 'Salvando...';
+    const body = {
+        name: fd.get('name'),
+        sets: fd.get('sets'),
+        reps: fd.get('reps'),
+        weight: fd.get('weight') || null,
+        restSeconds: fd.get('restSeconds') || null,
+        notes: fd.get('notes') || null
+    };
+    try {
+        const r = await fetch('/workouts/exercises/' + id, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': _csrf }, body: JSON.stringify(body) });
+        const d = await r.json();
+        if (d.success) { toast('Exercicio atualizado!', 'success'); loadExercises(planId); }
+        else toast(d.message || 'Erro', 'error');
+    } catch(_) { toast('Erro de conexao', 'error'); }
+    finally { btn.disabled = false; btn.textContent = 'Salvar'; }
+}
+
+// --- Adicionar Exercicio ---
+function toggleAddEx(planId) {
+    const form = document.getElementById('add-form-' + planId);
+    const isOpen = form.style.display === 'none' || !form.style.display;
+    form.style.display = isOpen ? 'block' : 'none';
+    if (isOpen) form.querySelector('[name="name"]').focus();
+}
+
+async function submitAddEx(e, planId) {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const btn = e.target.querySelector('[type="submit"]');
+    btn.disabled = true;
+    try {
+        const r = await fetch('/workouts/plans/' + planId + '/exercises', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': _csrf },
+            body: JSON.stringify({ name: fd.get('name'), sets: fd.get('sets'), reps: fd.get('reps'), weight: fd.get('weight')||null, restSeconds: fd.get('restSeconds')||null, notes: fd.get('notes')||null })
+        });
+        const d = await r.json();
+        if (d.success) {
+            const cameraImage = fd.get('cameraImage');
+            const galleryImage = fd.get('galleryImage');
+
+            if (cameraImage && cameraImage.size > 0) {
+                await uploadExerciseImageFile(d.exercise.id, cameraImage);
+            }
+
+            if (galleryImage && galleryImage.size > 0) {
+                await uploadExerciseImageFile(d.exercise.id, galleryImage);
+            }
+
+            toast('Exercicio adicionado!', 'success');
+            e.target.reset();
+            document.getElementById('add-form-' + planId).style.display = 'none';
+            loadExercises(planId);
+        } else toast(d.message || 'Erro', 'error');
+    } catch(_) { toast('Erro de conexao', 'error'); }
+    finally { btn.disabled = false; }
+}
+
+async function uploadExerciseImageFile(exerciseId, file) {
+    const imageForm = new FormData();
+    imageForm.append('image', file);
+
+    const response = await fetch('/workouts/exercises/' + exerciseId + '/images', {
+        method: 'POST',
+        headers: { 'X-CSRF-Token': _csrf, 'Accept': 'application/json' },
+        body: imageForm,
+    });
+
+    const data = await response.json().catch(function () {
+        return { success: false, message: 'Falha ao interpretar resposta do upload.' };
+    });
+    if (!data.success) {
+        throw new Error(data.message || 'Falha no upload da imagem');
+    }
+}
+
+// --- Deletar Exercicio ---
+async function deleteEx(id, planId, name) {
+    if (!confirm('Deletar "' + name + '"?')) return;
+    try {
+        const r = await fetch('/workouts/exercises/' + id, { method: 'DELETE', headers: { 'X-CSRF-Token': _csrf, 'Accept': 'application/json' } });
+        const d = await r.json();
+        if (d.success) { toast('Deletado!', 'success'); loadExercises(planId); }
+        else toast(d.message || 'Erro', 'error');
+    } catch(_) { toast('Erro de conexao', 'error'); }
+}
+</script>

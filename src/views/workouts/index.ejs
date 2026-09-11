@@ -1,0 +1,75 @@
+<div class="workouts-page">
+    <!-- Header Stats -->
+    <div class="stats-card">
+        <div class="stat-item">
+            <h3>🏆 Total de Treinos Realizados</h3>
+            <p class="stat-value"><%= totalSessions %></p>
+        </div>
+    </div>
+
+    <!-- Workout Plans Grid -->
+    <div class="workouts-grid">
+        <% if (plans.length > 0) { %>
+            <% plans.forEach(plan => { %>
+                <div class="workout-card">
+                    <div class="card-header">
+                        <h2><%= plan.name %></h2>
+                        <% if (plan.dayOfWeek) { %>
+                            <span class="day-badge"><%= plan.dayOfWeek %></span>
+                        <% } %>
+                    </div>
+
+                    <div class="card-body">
+                        <% if (plan.description) { %>
+                            <p class="description"><%= plan.description %></p>
+                        <% } %>
+
+                        <div class="card-stats">
+                            <div class="stat">
+                                <span class="stat-icon">💪</span>
+                                <span><%= plan.exercises.length %> exercícios</span>
+                            </div>
+                            <div class="stat">
+                                <span class="stat-icon">✅</span>
+                                <span><%= plan.sessions.length %> treinos</span>
+                            </div>
+                        </div>
+
+                        <!-- Exercise List -->
+                        <div class="exercises-preview">
+                            <% plan.exercises.slice(0, 5).forEach(ex => { %>
+                                <div class="exercise-preview">
+                                    <span><%= ex.name %></span>
+                                    <span class="sets-reps"><%= ex.sets %>x<%= ex.reps %></span>
+                                </div>
+                            <% }); %>
+                            <% if (plan.exercises.length > 5) { %>
+                                <div class="more-exercises">+<%= plan.exercises.length - 5 %> mais</div>
+                            <% } %>
+                        </div>
+                    </div>
+
+                    <div class="card-footer">
+                        <form method="POST" action="/workouts/<%= plan.id %>/start" style="display: inline;">
+                            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                ▶ Iniciar Treino
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            <% }); %>
+        <% } else { %>
+            <div class="empty-state">
+                <p>Nenhum plano de treino disponível</p>
+            </div>
+        <% } %>
+    </div>
+
+    <!-- History Link -->
+    <div class="actions-section">
+        <a href="/workouts/history" class="btn btn-secondary">
+            📊 Ver Histórico de Treinos
+        </a>
+    </div>
+</div>

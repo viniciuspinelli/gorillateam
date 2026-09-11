@@ -1,0 +1,63 @@
+<div class="admin-page">
+    <div class="page-header">
+        <h1><% if (isAdmin) { %>⚡ Painel Admin<% } else { %>🎓 Painel Instrutor<% } %></h1>
+        <p class="page-subtitle">Bem-vindo, <%= user.username %></p>
+    </div>
+
+    <div class="admin-stats-grid">
+        <div class="admin-stat-card">
+            <div class="admin-stat-icon">👥</div>
+            <div class="admin-stat-info">
+                <span class="admin-stat-value"><%= stats.users %></span>
+                <span class="admin-stat-label">Alunos</span>
+            </div>
+        </div>
+        <div class="admin-stat-card">
+            <div class="admin-stat-icon">🏋️</div>
+            <div class="admin-stat-info">
+                <span class="admin-stat-value"><%= stats.workoutTemplates %></span>
+                <span class="admin-stat-label">Treinos na Biblioteca</span>
+            </div>
+        </div>
+        <div class="admin-stat-card">
+            <div class="admin-stat-icon">🥗</div>
+            <div class="admin-stat-info">
+                <span class="admin-stat-value"><%= stats.dietTemplates %></span>
+                <span class="admin-stat-label">Dietas na Biblioteca</span>
+            </div>
+        </div>
+        <div class="admin-stat-card">
+            <div class="admin-stat-icon">✅</div>
+            <div class="admin-stat-info">
+                <span class="admin-stat-value"><%= stats.sessions %></span>
+                <span class="admin-stat-label">Treinos Realizados</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="admin-quick-actions">
+        <h2>Acesso Rápido</h2>
+        <div class="admin-action-grid">
+            <a href="/admin/users" class="admin-action-card">
+                <span class="admin-action-icon">👥</span>
+                <span class="admin-action-label">Gerenciar Alunos</span>
+                <span class="admin-action-desc">Criar, editar e atribuir planos</span>
+            </a>
+            <a href="/admin/users/new" class="admin-action-card">
+                <span class="admin-action-icon">➕</span>
+                <span class="admin-action-label">Novo Aluno</span>
+                <span class="admin-action-desc">Cadastrar um novo usuário</span>
+            </a>
+            <a href="/admin/templates" class="admin-action-card">
+                <span class="admin-action-icon">📚</span>
+                <span class="admin-action-label">Biblioteca de Planos</span>
+                <span class="admin-action-desc">Gerencie templates de treino e dieta</span>
+            </a>
+            <a href="/workouts/plans" class="admin-action-card">
+                <span class="admin-action-icon">🏋️</span>
+                <span class="admin-action-label">Criar Treino Template</span>
+                <span class="admin-action-desc">Acesse o editor de treinos</span>
+            </a>
+        </div>
+    </div>
+</div>

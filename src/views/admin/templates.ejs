@@ -1,0 +1,608 @@
+<div class="admin-page">
+    <div class="page-header">
+        <div>
+            <h1>📚 Biblioteca de Planos</h1>
+            <p class="page-subtitle">Templates que podem ser atribuídos a qualquer aluno</p>
+        </div>
+    </div>
+
+    <div class="admin-detail-grid">
+        <!-- ===== WORKOUT TEMPLATES ===== -->
+        <div class="admin-detail-section">
+            <div class="admin-section-header">
+                <h2>🏋️ Templates de Treino</h2>
+                <button class="btn btn-sm btn-primary" onclick="toggleWkCreatePanel()">➕ Novo Template</button>
+            </div>
+
+            <!-- Inline: criar template de treino -->
+            <div class="inline-panel" id="wk-panel-create">
+                <div class="inline-panel-header">
+                    <span class="inline-panel-title">Novo Template de Treino</span>
+                    <button class="modal-close" onclick="toggleWkCreatePanel()">&times;</button>
+                </div>
+                <form onsubmit="submitCreateWk(event)" class="inline-panel-form">
+                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                    <div class="form-group">
+                        <label>Nome *</label>
+                        <input type="text" id="wk-c-name" name="name" placeholder="ex: Peito e Costas" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Descrição</label>
+                        <textarea id="wk-c-desc" name="description" rows="2" placeholder="Objetivo do plano..."></textarea>
+                    </div>
+                    <div class="inline-panel-actions">
+                        <button type="submit" class="btn btn-primary" id="btn-wk-create">Criar Template</button>
+                        <button type="button" class="btn btn-secondary" onclick="toggleWkCreatePanel()">Cancelar</button>
+                    </div>
+                </form>
+            </div>
+
+            <% if (workoutTemplates.length > 0) { %>
+                <div class="assigned-plans-list" id="wk-templates-list">
+                    <% workoutTemplates.forEach(t => { %>
+                        <div class="plan-card" id="wk-card-<%= t.id %>">
+                            <div class="assigned-plan-row">
+                                <div class="assigned-plan-info">
+                                    <span class="assigned-plan-name"><%= t.name %></span>
+                                    <% if (t.dayOfWeek) { %><span class="plan-badge"><%= t.dayOfWeek %></span><% } %>
+                                    <span class="plan-badge" id="wk-excnt-<%= t.id %>"><%= t.exercise_count %> exercícios</span>
+                                </div>
+                                <div style="display:flex;gap:6px;align-items:center;">
+                                    <button class="btn btn-sm btn-secondary" id="wk-btn-edit-<%= t.id %>" onclick="toggleWkExPanel(<%= t.id %>)">Editar</button>
+                                    <button class="btn btn-sm btn-danger" onclick="deleteTemplate('workout', <%= t.id %>, '<%= t.name.replace(/'/g, "\\'") %>')">🗑️</button>
+                                </div>
+                            </div>
+                            <!-- Exercises panel -->
+                            <div class="plan-exercises-panel" id="wk-ex-panel-<%= t.id %>">
+                                <div class="exercises-panel-header">
+                                    <span class="exercises-section-label">EXERCÍCIOS</span>
+                                    <button class="btn-icon" onclick="toggleWkExPanel(<%= t.id %>)">
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                                    </button>
+                                </div>
+                                <div id="wk-ex-list-<%= t.id %>"></div>
+                                <!-- Add exercise -->
+                                <div class="add-exercise-details" id="wk-add-details-<%= t.id %>">
+                                    <button class="add-exercise-summary" type="button" onclick="toggleWkAddEx(<%= t.id %>)">
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                                        Adicionar Exercício
+                                    </button>
+                                    <div class="add-exercise-body" id="wk-add-form-<%= t.id %>" style="display:none">
+                                        <form onsubmit="submitWkAddEx(event, <%= t.id %>)">
+                                            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                                            <div class="form-grid-3">
+                                                <div class="form-group">
+                                                    <label>Nome *</label>
+                                                    <input type="text" name="name" placeholder="ex: Supino" required>
+                                                </div>
+                                                <div class="form-group">
+                                                    <label>Séries *</label>
+                                                    <input type="number" name="sets" placeholder="4" min="1" max="20" required>
+                                                </div>
+                                                <div class="form-group">
+                                                    <label>Reps *</label>
+                                                    <input type="text" name="reps" placeholder="8-12" required>
+                                                </div>
+                                            </div>
+                                            <div class="form-grid-3">
+                                                <div class="form-group">
+                                                    <label>Carga</label>
+                                                    <input type="text" name="weight" placeholder="60kg">
+                                                </div>
+                                                <div class="form-group">
+                                                    <label>Descanso (seg)</label>
+                                                    <input type="number" name="restSeconds" placeholder="60" min="0">
+                                                </div>
+                                                <div class="form-group">
+                                                    <label>Notas</label>
+                                                    <input type="text" name="notes" placeholder="Dicas...">
+                                                </div>
+                                            </div>
+                                            <div class="inline-edit-actions">
+                                                <button type="submit" class="btn btn-primary btn-sm">Adicionar</button>
+                                                <button type="button" class="btn btn-secondary btn-sm" onclick="toggleWkAddEx(<%= t.id %>)">Cancelar</button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    <% }); %>
+                </div>
+            <% } else { %>
+                <p class="empty-hint" id="wk-empty-hint">Nenhum template de treino na biblioteca.</p>
+            <% } %>
+        </div>
+
+        <!-- ===== DIET TEMPLATES ===== -->
+        <div class="admin-detail-section">
+            <div class="admin-section-header">
+                <h2>🥗 Templates de Dieta</h2>
+                <button class="btn btn-sm btn-primary" onclick="toggleDtCreatePanel()">➕ Novo Template</button>
+            </div>
+
+            <!-- Inline: criar template de dieta -->
+            <div class="inline-panel" id="dt-panel-create">
+                <div class="inline-panel-header">
+                    <span class="inline-panel-title">Novo Template de Dieta</span>
+                    <button class="modal-close" onclick="toggleDtCreatePanel()">&times;</button>
+                </div>
+                <form onsubmit="submitCreateDt(event)" class="inline-panel-form">
+                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                    <div class="form-group">
+                        <label>Nome *</label>
+                        <input type="text" id="dt-c-name" name="name" placeholder="ex: Dieta de Bulking" required>
+                    </div>
+                    <div class="inline-panel-actions">
+                        <button type="submit" class="btn btn-primary" id="btn-dt-create">Criar Template</button>
+                        <button type="button" class="btn btn-secondary" onclick="toggleDtCreatePanel()">Cancelar</button>
+                    </div>
+                </form>
+            </div>
+
+            <% if (dietTemplates.length > 0) { %>
+                <div class="assigned-plans-list" id="dt-templates-list">
+                    <% dietTemplates.forEach(t => { %>
+                        <div class="plan-card" id="dt-card-<%= t.id %>">
+                            <div class="assigned-plan-row">
+                                <div class="assigned-plan-info">
+                                    <span class="assigned-plan-name"><%= t.name %></span>
+                                    <span class="plan-badge" id="dt-mealcnt-<%= t.id %>"><%= t.meal_count %> refeições</span>
+                                </div>
+                                <div style="display:flex;gap:6px;align-items:center;">
+                                    <button class="btn btn-sm btn-secondary" id="dt-btn-edit-<%= t.id %>" onclick="toggleDtMealPanel(<%= t.id %>)">Editar</button>
+                                    <button class="btn btn-sm btn-danger" onclick="deleteTemplate('diet', <%= t.id %>, '<%= t.name.replace(/'/g, "\\'") %>')">🗑️</button>
+                                </div>
+                            </div>
+                            <!-- Meals panel -->
+                            <div class="plan-exercises-panel" id="dt-meal-panel-<%= t.id %>">
+                                <div class="exercises-panel-header">
+                                    <span class="exercises-section-label">REFEIÇÕES</span>
+                                    <button class="btn-icon" onclick="toggleDtMealPanel(<%= t.id %>)">
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                                    </button>
+                                </div>
+                                <div id="dt-meal-list-<%= t.id %>"></div>
+                                <!-- Add meal -->
+                                <div class="add-exercise-details" id="dt-add-meal-details-<%= t.id %>">
+                                    <button class="add-exercise-summary" type="button" onclick="toggleDtAddMeal(<%= t.id %>)">
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                                        Adicionar Refeição
+                                    </button>
+                                    <div class="add-exercise-body" id="dt-add-meal-form-<%= t.id %>" style="display:none">
+                                        <form onsubmit="submitDtAddMeal(event, <%= t.id %>)">
+                                            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                                            <div class="form-row">
+                                                <div class="form-group">
+                                                    <label>Nome *</label>
+                                                    <input type="text" name="name" placeholder="ex: Café da Manhã" required>
+                                                </div>
+                                                <div class="form-group">
+                                                    <label>Horário</label>
+                                                    <input type="time" name="time">
+                                                </div>
+                                            </div>
+                                            <div class="inline-edit-actions">
+                                                <button type="submit" class="btn btn-primary btn-sm">Adicionar</button>
+                                                <button type="button" class="btn btn-secondary btn-sm" onclick="toggleDtAddMeal(<%= t.id %>)">Cancelar</button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    <% }); %>
+                </div>
+            <% } else { %>
+                <p class="empty-hint" id="dt-empty-hint">Nenhum template de dieta na biblioteca.</p>
+            <% } %>
+        </div>
+    </div>
+</div>
+
+<script nonce="<%= nonce %>">
+const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+
+// ── Toast ──────────────────────────────────────────────────────────
+function showToast(msg, type = 'info') {
+    let c = document.querySelector('.toast-container');
+    if (!c) { c = document.createElement('div'); c.className = 'toast-container'; document.body.appendChild(c); }
+    const t = document.createElement('div');
+    t.className = 'toast toast-' + type;
+    t.textContent = msg;
+    c.appendChild(t);
+    requestAnimationFrame(() => t.classList.add('show'));
+    setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 400); }, 3500);
+}
+
+function esc(s) { return String(s || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'"); }
+function escH(s) { return String(s || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+
+// ══════════════════════════════════════════════════════════════════
+//  WORKOUT TEMPLATES
+// ══════════════════════════════════════════════════════════════════
+
+function toggleWkCreatePanel() {
+    const p = document.getElementById('wk-panel-create');
+    const open = p.classList.toggle('open');
+    if (open) { p.querySelector('form').reset(); document.getElementById('wk-c-name').focus(); }
+}
+
+async function submitCreateWk(e) {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const btn = document.getElementById('btn-wk-create');
+    btn.disabled = true; btn.textContent = 'Criando...';
+    try {
+        const r = await fetch('/admin/templates/workouts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+            body: JSON.stringify({ name: fd.get('name'), description: fd.get('description') || null })
+        });
+        const d = await r.json();
+        if (d.success) { showToast('Template criado!', 'success'); setTimeout(() => location.reload(), 1000); }
+        else showToast(d.message || 'Erro', 'error');
+    } catch (_) { showToast('Erro de conexão', 'error'); }
+    finally { btn.disabled = false; btn.textContent = 'Criar Template'; }
+}
+
+// — Exercises panel —
+let _wkOpenId = null;
+
+function toggleWkExPanel(id) {
+    const panel = document.getElementById('wk-ex-panel-' + id);
+    const editBtn = document.getElementById('wk-btn-edit-' + id);
+    if (_wkOpenId && _wkOpenId !== id) {
+        const prev = document.getElementById('wk-ex-panel-' + _wkOpenId);
+        const prevBtn = document.getElementById('wk-btn-edit-' + _wkOpenId);
+        if (prev) prev.classList.remove('open');
+        if (prevBtn) prevBtn.textContent = 'Editar';
+        _wkOpenId = null;
+    }
+    const isOpen = panel.classList.toggle('open');
+    if (isOpen) { editBtn.textContent = 'Fechar'; _wkOpenId = id; loadWkExercises(id); }
+    else { editBtn.textContent = 'Editar'; _wkOpenId = null; }
+}
+
+async function loadWkExercises(planId) {
+    const list = document.getElementById('wk-ex-list-' + planId);
+    list.innerHTML = '<p class="exercises-loading">Carregando...</p>';
+    try {
+        const r = await fetch('/workouts/plans/' + planId + '/exercises');
+        const d = await r.json();
+        if (!d.success || d.exercises.length === 0) {
+            list.innerHTML = '<p class="no-exercises-msg">Nenhum exercício ainda</p>';
+            return;
+        }
+        list.innerHTML = d.exercises.map((ex, i) =>
+            '<div class="exercise-row" id="wk-exrow-' + ex.id + '">' +
+            '<div class="exercise-row-number">' + (i + 1) + '</div>' +
+            '<div class="exercise-row-info">' +
+                '<span class="exercise-row-name">' + escH(ex.name) + '</span>' +
+                '<div class="exercise-row-meta">' +
+                    '<span class="meta-pill">' + ex.sets + 'x' + ex.reps + '</span>' +
+                    (ex.weight ? '<span class="meta-pill">' + escH(ex.weight) + '</span>' : '') +
+                    (ex.restSeconds ? '<span class="meta-pill">' + ex.restSeconds + 's</span>' : '') +
+                    (ex.notes ? '<span class="meta-pill meta-notes">' + escH(ex.notes) + '</span>' : '') +
+                '</div>' +
+            '</div>' +
+            '<div class="exercise-row-actions">' +
+                '<button class="btn-icon" onclick="showWkExEdit(' + ex.id + ',' + planId + ',\'' + esc(ex.name) + '\',' + ex.sets + ',\'' + esc(ex.reps) + '\',\'' + esc(ex.weight || '') + '\',' + (ex.restSeconds || 0) + ',\'' + esc(ex.notes || '') + '\')" title="Editar">' +
+                    '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>' +
+                '</button>' +
+                '<button class="btn-icon btn-icon-danger" onclick="deleteWkEx(' + ex.id + ',' + planId + ',\'' + esc(ex.name) + '\')" title="Deletar">' +
+                    '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>' +
+                '</button>' +
+            '</div>' +
+            '</div>'
+        ).join('');
+    } catch (_) { list.innerHTML = '<p class="error-msg">Erro ao carregar</p>'; }
+}
+
+function showWkExEdit(id, planId, name, sets, reps, weight, rest, notes) {
+    const row = document.getElementById('wk-exrow-' + id);
+    row.innerHTML =
+        '<form class="exercise-inline-edit" onsubmit="saveWkExInline(event,' + id + ',' + planId + ')">' +
+        '<div class="inline-edit-grid">' +
+            '<input class="inline-input inline-input-wide" type="text" name="name" value="' + escH(name) + '" placeholder="Nome" required>' +
+            '<input class="inline-input" type="number" name="sets" value="' + sets + '" min="1" max="20" placeholder="Séries" required>' +
+            '<input class="inline-input" type="text" name="reps" value="' + escH(reps) + '" placeholder="Reps" required>' +
+            '<input class="inline-input" type="text" name="weight" value="' + escH(weight) + '" placeholder="Carga">' +
+            '<input class="inline-input" type="number" name="restSeconds" value="' + rest + '" min="0" placeholder="Descanso">' +
+            '<input class="inline-input inline-input-wide" type="text" name="notes" value="' + escH(notes) + '" placeholder="Notas">' +
+        '</div>' +
+        '<div class="inline-edit-actions">' +
+            '<button type="submit" class="btn btn-primary btn-sm">Salvar</button>' +
+            '<button type="button" class="btn btn-secondary btn-sm" onclick="loadWkExercises(' + planId + ')">Cancelar</button>' +
+        '</div>' +
+        '</form>';
+}
+
+async function saveWkExInline(e, exId, planId) {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    try {
+        const r = await fetch('/workouts/exercises/' + exId, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+            body: JSON.stringify({ name: fd.get('name'), sets: parseInt(fd.get('sets')), reps: fd.get('reps'), weight: fd.get('weight') || null, restSeconds: fd.get('restSeconds') ? parseInt(fd.get('restSeconds')) : null, notes: fd.get('notes') || null })
+        });
+        const d = await r.json();
+        if (d.success) { showToast('Exercício atualizado', 'success'); loadWkExercises(planId); }
+        else showToast(d.message || 'Erro', 'error');
+    } catch (_) { showToast('Erro de conexão', 'error'); }
+}
+
+function toggleWkAddEx(planId) {
+    const form = document.getElementById('wk-add-form-' + planId);
+    form.style.display = form.style.display === 'none' ? 'block' : 'none';
+    if (form.style.display === 'block') form.querySelector('input[name="name"]').focus();
+}
+
+async function submitWkAddEx(e, planId) {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const btn = e.target.querySelector('[type="submit"]');
+    btn.disabled = true;
+    try {
+        const r = await fetch('/workouts/plans/' + planId + '/exercises', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+            body: JSON.stringify({ name: fd.get('name'), sets: parseInt(fd.get('sets')), reps: fd.get('reps'), weight: fd.get('weight') || null, restSeconds: fd.get('restSeconds') ? parseInt(fd.get('restSeconds')) : null, notes: fd.get('notes') || null })
+        });
+        const d = await r.json();
+        if (d.success) {
+            e.target.reset();
+            document.getElementById('wk-add-form-' + planId).style.display = 'none';
+            showToast('Exercício adicionado!', 'success');
+            loadWkExercises(planId);
+            const badge = document.getElementById('wk-excnt-' + planId);
+            if (badge) { const n = parseInt(badge.textContent) + 1; badge.textContent = n + ' exercício' + (n !== 1 ? 's' : ''); }
+        } else showToast(d.message || 'Erro', 'error');
+    } catch (_) { showToast('Erro de conexão', 'error'); }
+    finally { btn.disabled = false; }
+}
+
+async function deleteWkEx(exId, planId, name) {
+    if (!confirm('Remover exercício "' + name + '"?')) return;
+    try {
+        const r = await fetch('/workouts/exercises/' + exId, { method: 'DELETE', headers: { 'X-CSRF-Token': csrfToken } });
+        const d = await r.json();
+        if (d.success) {
+            showToast('Exercício removido', 'success');
+            loadWkExercises(planId);
+            const badge = document.getElementById('wk-excnt-' + planId);
+            if (badge) { const n = Math.max(0, parseInt(badge.textContent) - 1); badge.textContent = n + ' exercício' + (n !== 1 ? 's' : ''); }
+        } else showToast(d.message || 'Erro', 'error');
+    } catch (_) { showToast('Erro de conexão', 'error'); }
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  DIET TEMPLATES
+// ══════════════════════════════════════════════════════════════════
+
+function toggleDtCreatePanel() {
+    const p = document.getElementById('dt-panel-create');
+    const open = p.classList.toggle('open');
+    if (open) { p.querySelector('form').reset(); document.getElementById('dt-c-name').focus(); }
+}
+
+async function submitCreateDt(e) {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const btn = document.getElementById('btn-dt-create');
+    btn.disabled = true; btn.textContent = 'Criando...';
+    try {
+        const r = await fetch('/admin/templates/diets', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+            body: JSON.stringify({ name: fd.get('name') })
+        });
+        const d = await r.json();
+        if (d.success) { showToast('Template criado!', 'success'); setTimeout(() => location.reload(), 1000); }
+        else showToast(d.message || 'Erro', 'error');
+    } catch (_) { showToast('Erro de conexão', 'error'); }
+    finally { btn.disabled = false; btn.textContent = 'Criar Template'; }
+}
+
+// — Meals panel —
+let _dtOpenId = null;
+
+function toggleDtMealPanel(id) {
+    const panel = document.getElementById('dt-meal-panel-' + id);
+    const editBtn = document.getElementById('dt-btn-edit-' + id);
+    if (_dtOpenId && _dtOpenId !== id) {
+        const prev = document.getElementById('dt-meal-panel-' + _dtOpenId);
+        const prevBtn = document.getElementById('dt-btn-edit-' + _dtOpenId);
+        if (prev) prev.classList.remove('open');
+        if (prevBtn) prevBtn.textContent = 'Editar';
+        _dtOpenId = null;
+    }
+    const isOpen = panel.classList.toggle('open');
+    if (isOpen) { editBtn.textContent = 'Fechar'; _dtOpenId = id; loadDtMeals(id); }
+    else { editBtn.textContent = 'Editar'; _dtOpenId = null; }
+}
+
+async function loadDtMeals(planId) {
+    const list = document.getElementById('dt-meal-list-' + planId);
+    list.innerHTML = '<p class="exercises-loading">Carregando...</p>';
+    try {
+        const r = await fetch('/admin/templates/diets/' + planId + '/meals');
+        const d = await r.json();
+        if (!d.success || d.meals.length === 0) {
+            list.innerHTML = '<p class="no-exercises-msg">Nenhuma refeição ainda</p>';
+            return;
+        }
+        list.innerHTML = d.meals.map(meal => renderMealRow(meal, planId)).join('');
+    } catch (_) { list.innerHTML = '<p class="error-msg">Erro ao carregar</p>'; }
+}
+
+function renderMealRow(meal, planId) {
+    const foodRows = meal.foods.length > 0
+        ? '<table class="foods-table" style="margin:8px 0 0 0;font-size:12px;">' +
+            '<thead><tr><th>Alimento</th><th>Qtd</th><th>Kcal</th><th></th></tr></thead>' +
+            '<tbody>' +
+            meal.foods.map(f =>
+                '<tr>' +
+                '<td>' + escH(f.name) + '</td>' +
+                '<td>' + escH(f.quantity || '—') + '</td>' +
+                '<td>' + (f.calories ? f.calories + ' kcal' : '—') + '</td>' +
+                '<td><button class="btn-icon btn-icon-danger" onclick="deleteDtFood(' + f.id + ',' + planId + ')" title="Remover">' +
+                    '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>' +
+                '</button></td>' +
+                '</tr>'
+            ).join('') +
+            '</tbody></table>'
+        : '<p class="no-exercises-msg" style="font-size:12px;margin:4px 0 8px 0;">Nenhum alimento</p>';
+
+    const addFoodForm =
+        '<div style="margin-top:6px;">' +
+        '<button class="add-exercise-summary" type="button" onclick="toggleDtFoodForm(' + meal.id + ')" style="font-size:12px;">' +
+            '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>' +
+            ' Adicionar Alimento' +
+        '</button>' +
+        '<div id="dt-food-form-' + meal.id + '" style="display:none;padding:8px 0;">' +
+            '<form onsubmit="submitDtAddFood(event,' + meal.id + ',' + planId + ')">' +
+                '<div class="form-grid-3" style="gap:6px;">' +
+                    '<div class="form-group"><label style="font-size:11px;">Nome *</label><input type="text" name="name" placeholder="Frango grelhado" required style="font-size:12px;"></div>' +
+                    '<div class="form-group"><label style="font-size:11px;">Qtd</label><input type="text" name="quantity" placeholder="150g" style="font-size:12px;"></div>' +
+                    '<div class="form-group"><label style="font-size:11px;">Calorias (kcal)</label><input type="number" name="calories" placeholder="0" min="0" step="0.01" style="font-size:12px;"></div>' +
+                '</div>' +
+                '<div class="form-grid-3" style="gap:6px;">' +
+                    '<div class="form-group"><label style="font-size:11px;">Proteína (g)</label><input type="number" name="protein" placeholder="0" min="0" step="0.1" style="font-size:12px;"></div>' +
+                    '<div class="form-group"><label style="font-size:11px;">Carbs (g)</label><input type="number" name="carbs" placeholder="0" min="0" step="0.1" style="font-size:12px;"></div>' +
+                    '<div class="form-group"><label style="font-size:11px;">Gordura (g)</label><input type="number" name="fat" placeholder="0" min="0" step="0.1" style="font-size:12px;"></div>' +
+                '</div>' +
+                '<div class="inline-edit-actions">' +
+                    '<button type="submit" class="btn btn-primary btn-sm">Adicionar</button>' +
+                    '<button type="button" class="btn btn-secondary btn-sm" onclick="toggleDtFoodForm(' + meal.id + ')">Cancelar</button>' +
+                '</div>' +
+            '</form>' +
+        '</div>' +
+        '</div>';
+
+    return '<div class="exercise-row" id="dt-mealrow-' + meal.id + '" style="flex-direction:column;align-items:stretch;">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+            '<div class="exercise-row-info">' +
+                '<span class="exercise-row-name">' + escH(meal.name) + '</span>' +
+                (meal.time ? '<span class="meta-pill" style="margin-left:6px;">' + escH(meal.time) + '</span>' : '') +
+                '<span class="meta-pill" style="margin-left:4px;">' + meal.foods.length + ' alimento' + (meal.foods.length !== 1 ? 's' : '') + '</span>' +
+            '</div>' +
+            '<button class="btn-icon btn-icon-danger" onclick="deleteDtMeal(' + meal.id + ',' + planId + ',\'' + esc(meal.name) + '\')" title="Remover refeição">' +
+                '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>' +
+            '</button>' +
+        '</div>' +
+        foodRows +
+        addFoodForm +
+    '</div>';
+}
+
+function toggleDtAddMeal(planId) {
+    const form = document.getElementById('dt-add-meal-form-' + planId);
+    form.style.display = form.style.display === 'none' ? 'block' : 'none';
+    if (form.style.display === 'block') form.querySelector('input[name="name"]').focus();
+}
+
+async function submitDtAddMeal(e, planId) {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const btn = e.target.querySelector('[type="submit"]');
+    btn.disabled = true;
+    try {
+        const r = await fetch('/diet/meals', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+            body: JSON.stringify({ mealPlanId: planId, name: fd.get('name'), time: fd.get('time') || null })
+        });
+        const d = await r.json();
+        if (d.success) {
+            e.target.reset();
+            document.getElementById('dt-add-meal-form-' + planId).style.display = 'none';
+            showToast('Refeição adicionada!', 'success');
+            loadDtMeals(planId);
+            const badge = document.getElementById('dt-mealcnt-' + planId);
+            if (badge) { const n = parseInt(badge.textContent) + 1; badge.textContent = n + ' refeição' + (n !== 1 ? 'ões' : ''); }
+        } else showToast(d.message || 'Erro', 'error');
+    } catch (_) { showToast('Erro de conexão', 'error'); }
+    finally { btn.disabled = false; }
+}
+
+async function deleteDtMeal(mealId, planId, name) {
+    if (!confirm('Remover refeição "' + name + '"?')) return;
+    try {
+        const r = await fetch('/diet/meals/' + mealId, { method: 'DELETE', headers: { 'X-CSRF-Token': csrfToken } });
+        const d = await r.json();
+        if (d.success) {
+            showToast('Refeição removida', 'success');
+            loadDtMeals(planId);
+            const badge = document.getElementById('dt-mealcnt-' + planId);
+            if (badge) { const n = Math.max(0, parseInt(badge.textContent) - 1); badge.textContent = n + ' refeição' + (n !== 1 ? 'ões' : ''); }
+        } else showToast(d.message || 'Erro', 'error');
+    } catch (_) { showToast('Erro de conexão', 'error'); }
+}
+
+function toggleDtFoodForm(mealId) {
+    const form = document.getElementById('dt-food-form-' + mealId);
+    form.style.display = form.style.display === 'none' ? 'block' : 'none';
+    if (form.style.display === 'block') form.querySelector('input[name="name"]').focus();
+}
+
+async function submitDtAddFood(e, mealId, planId) {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const btn = e.target.querySelector('[type="submit"]');
+    btn.disabled = true;
+    try {
+        const body = {
+            mealId,
+            name: fd.get('name'),
+            quantity: fd.get('quantity') || null,
+            calories: fd.get('calories') || null,
+            protein: fd.get('protein') || null,
+            carbs: fd.get('carbs') || null,
+            fat: fd.get('fat') || null
+        };
+        const r = await fetch('/diet/meals/' + mealId + '/foods', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+            body: JSON.stringify(body)
+        });
+        const d = await r.json();
+        if (d.success) {
+            e.target.reset();
+            document.getElementById('dt-food-form-' + mealId).style.display = 'none';
+            showToast('Alimento adicionado!', 'success');
+            loadDtMeals(planId);
+        } else showToast(d.message || 'Erro', 'error');
+    } catch (_) { showToast('Erro de conexão', 'error'); }
+    finally { btn.disabled = false; }
+}
+
+async function deleteDtFood(foodId, planId) {
+    if (!confirm('Remover este alimento?')) return;
+    try {
+        const r = await fetch('/diet/foods/' + foodId, { method: 'DELETE', headers: { 'X-CSRF-Token': csrfToken } });
+        const d = await r.json();
+        if (d.success) { showToast('Alimento removido', 'success'); loadDtMeals(planId); }
+        else showToast(d.message || 'Erro', 'error');
+    } catch (_) { showToast('Erro de conexão', 'error'); }
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  DELETE TEMPLATE
+// ══════════════════════════════════════════════════════════════════
+
+async function deleteTemplate(type, id, name) {
+    if (!confirm(`Remover o template "${name}" da biblioteca?`)) return;
+    const url = type === 'workout'
+        ? `/admin/templates/workouts/${id}`
+        : `/admin/templates/diets/${id}`;
+    const res = await fetch(url, {
+        method: 'DELETE',
+        headers: { 'X-CSRF-Token': csrfToken }
+    });
+    const data = await res.json();
+    if (data.success) { showToast('Template removido', 'success'); setTimeout(() => location.reload(), 800); }
+    else showToast(data.message || 'Erro', 'error');
+}
+</script>

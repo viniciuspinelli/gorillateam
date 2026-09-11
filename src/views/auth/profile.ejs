@@ -1,0 +1,73 @@
+<div class="admin-page">
+    <div class="page-header">
+        <h1>👤 Meu Perfil</h1>
+        <p class="page-subtitle">Gerencie seus dados de acesso</p>
+    </div>
+
+    <% if (success) { %>
+        <div class="alert-success" style="margin-bottom:16px;padding:12px 16px;border-radius:8px;background:rgba(34,197,94,0.12);border:1px solid rgba(34,197,94,0.3);color:#22c55e;font-size:14px;">
+            ✅ <%= success %>
+        </div>
+    <% } %>
+
+    <% if (error) { %>
+        <div class="alert-error" style="margin-bottom:16px;padding:12px 16px;border-radius:8px;background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.3);color:#ef4444;font-size:14px;">
+            ⚠️ <%= error %>
+        </div>
+    <% } %>
+
+    <form method="POST" action="/profile" class="admin-form-card" style="max-width:520px;">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+        <!-- Dados Pessoais -->
+        <div class="admin-section-header" style="margin-bottom:16px;">
+            <h2 style="font-size:14px;font-weight:600;text-transform:uppercase;color:var(--text-muted);letter-spacing:.05em;">Dados Pessoais</h2>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Usuário</label>
+            <input type="text" class="form-input" value="<%= profile.username %>" disabled style="opacity:.5;cursor:not-allowed;">
+            <span style="font-size:11px;color:var(--text-muted);margin-top:4px;display:block;">O nome de usuário não pode ser alterado.</span>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label" for="fullName">Nome Completo</label>
+            <input type="text" id="fullName" name="fullName" class="form-input"
+                value="<%= profile.fullName || '' %>" placeholder="Seu nome completo" maxlength="100">
+        </div>
+
+        <div class="form-group">
+            <label class="form-label" for="email">E-mail</label>
+            <input type="email" id="email" name="email" class="form-input"
+                value="<%= profile.email || '' %>" placeholder="seu@email.com" required>
+        </div>
+
+        <!-- Alterar Senha -->
+        <div class="admin-section-header" style="margin:24px 0 16px;">
+            <h2 style="font-size:14px;font-weight:600;text-transform:uppercase;color:var(--text-muted);letter-spacing:.05em;">Alterar Senha <span style="font-weight:400;font-size:12px;">(opcional)</span></h2>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label" for="currentPassword">Senha Atual</label>
+            <input type="password" id="currentPassword" name="currentPassword" class="form-input"
+                placeholder="••••••••" autocomplete="current-password">
+        </div>
+
+        <div class="form-group">
+            <label class="form-label" for="newPassword">Nova Senha</label>
+            <input type="password" id="newPassword" name="newPassword" class="form-input"
+                placeholder="Mínimo 8 caracteres" autocomplete="new-password" minlength="8">
+        </div>
+
+        <div class="form-group">
+            <label class="form-label" for="confirmPassword">Confirmar Nova Senha</label>
+            <input type="password" id="confirmPassword" name="confirmPassword" class="form-input"
+                placeholder="••••••••" autocomplete="new-password">
+        </div>
+
+        <div style="margin-top:24px;display:flex;gap:10px;">
+            <button type="submit" class="btn btn-primary">Salvar Alterações</button>
+            <a href="/workouts" class="btn btn-secondary">Cancelar</a>
+        </div>
+    </form>
+</div>

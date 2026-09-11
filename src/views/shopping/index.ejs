@@ -1,0 +1,333 @@
+<div class="shopping-page">
+    <!-- Shopping List Header -->
+    <div class="shopping-header">
+        <h1>🛒 Lista de Compras</h1>
+        <div class="shopping-actions">
+            <button class="btn btn-secondary" onclick="importFromDiet()">
+                📥 Importar da Dieta (7 dias)
+            </button>
+            <button class="btn btn-secondary" onclick="clearChecked()">
+                🗑️ Limpar Marcados
+            </button>
+            <button class="btn btn-secondary" onclick="newList()">
+                📋 Nova Lista
+            </button>
+        </div>
+    </div>
+
+    <!-- Progress Bar -->
+    <div class="progress-container">
+        <div class="progress-label">
+            <span id="progress"><%= checkedItems %> de <%= totalItems %> itens comprados</span>
+        </div>
+        <div class="progress-bar">
+            <div id="progressFill" class="progress-fill" style="width: <%= totalItems > 0 ? (checkedItems / totalItems * 100) : 0 %>%"></div>
+        </div>
+    </div>
+
+    <!-- Shopping Items by Category -->
+    <% Object.entries(itemsByCategory).forEach(([category, items]) => { %>
+        <div class="category-section">
+            <h2 class="category-title">
+                <%= category %>
+                <span class="category-count">(<%= items.length %>)</span>
+            </h2>
+
+            <div class="items-list">
+                <% items.forEach(item => { %>
+                    <div class="shopping-item <%= item.isChecked ? 'checked' : '' %>" data-item-id="<%= item.id %>">
+                        <input type="checkbox" class="item-checkbox" <%= item.isChecked ? 'checked' : '' %>
+                               onchange="toggleItem(<%= item.id %>)">
+                        
+                        <div class="item-content">
+                            <span class="item-name"><%= item.name %></span>
+                            <% if (item.quantity) { %>
+                                <span class="item-quantity"><%= item.quantity %></span>
+                            <% } %>
+                            <% if (item.notes) { %>
+                                <span class="item-notes"><%= item.notes %></span>
+                            <% } %>
+                        </div>
+
+                        <button class="btn-delete" onclick="deleteItem(<%= item.id %>)">
+                            ✕
+                        </button>
+                    </div>
+                <% }); %>
+            </div>
+        </div>
+    <% }); %>
+
+    <!-- Add Item Form -->
+    <div class="add-item-section">
+        <h2>Adicionar Item</h2>
+        <form onsubmit="addItem(event)">
+            <input type="text" placeholder="Nome do item" required id="itemName">
+            <input type="text" placeholder="Quantidade" id="itemQuantity">
+            <select id="itemCategory">
+                <option value="Proteínas">Proteínas</option>
+                <option value="Carboidratos">Carboidratos</option>
+                <option value="Vegetais">Vegetais</option>
+                <option value="Laticínios">Laticínios</option>
+                <option value="Frutas">Frutas</option>
+                <option value="Outros">Outros</option>
+            </select>
+            <button type="submit" class="btn btn-primary">+ Adicionar</button>
+        </form>
+    </div>
+</div>
+
+<script nonce="<%= nonce %>">
+    const listId = '<%= list.id %>';
+    let isSubmittingItem = false;
+
+    // 🔧 Get CSRF token from page
+    function getCsrfToken() {
+        if (typeof csrfToken !== 'undefined') return csrfToken;
+        const meta = document.querySelector('meta[name="csrf-token"]');
+        if (meta) return meta.getAttribute('content');
+        const input = document.querySelector('input[name="_csrf"]');
+        if (input) return input.value;
+        throw new Error('CSRF token not found');
+    }
+
+    // 🔧 Toggle item with CSRF + error handling
+    function toggleItem(itemId) {
+        try {
+            fetch(`/shopping/items/${itemId}/toggle`, {
+                method: 'PATCH',
+                headers: {
+                    'X-CSRF-Token': getCsrfToken()
+                }
+            })
+            .then(res => {
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                return res.json();
+            })
+            .then(data => {
+                if (data.success) {
+                    document.querySelector(`[data-item-id="${itemId}"]`)?.classList.toggle('checked');
+                    updateProgress();
+                } else {
+                    throw new Error(data.message || 'Erro desconhecido');
+                }
+            })
+            .catch(error => {
+                console.error('Toggle error:', error);
+                showToast('Erro: ' + error.message, 'error');
+            });
+        } catch (error) {
+            console.error('Fatal error:', error);
+            showToast('Erro ao marcar item', 'error');
+        }
+    }
+
+    // 🔧 Delete item with CSRF + error handling
+    function deleteItem(itemId) {
+        if (confirm('Tem certeza que deseja remover este item?')) {
+            try {
+                fetch(`/shopping/items/${itemId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'X-CSRF-Token': getCsrfToken()
+                    }
+                })
+                .then(res => {
+                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                    return res.json();
+                })
+                .then(data => {
+                    if (data.success) {
+                        document.querySelector(`[data-item-id="${itemId}"]`)?.remove();
+                        updateProgress();
+                        showToast('Item removido ✓', 'success');
+                    } else {
+                        throw new Error(data.message || 'Erro desconhecido');
+                    }
+                })
+                .catch(error => {
+                    console.error('Delete error:', error);
+                    showToast('Erro: ' + error.message, 'error');
+                });
+            } catch (error) {
+                console.error('Fatal error:', error);
+                showToast('Erro ao remover item', 'error');
+            }
+        }
+    }
+
+    // 🔧 Add item with validation + CSRF + error handling
+    function addItem(event) {
+        event.preventDefault();
+        
+        if (isSubmittingItem) return; // Prevenir double-submit
+        
+        const name = document.getElementById('itemName').value?.trim();
+        const quantity = document.getElementById('itemQuantity').value?.trim();
+        const category = document.getElementById('itemCategory').value;
+        const submitBtn = event.target.querySelector('button[type="submit"]');
+
+        // 🔧 Validar
+        if (!name || name.length < 2) {
+            showToast('Nome do item deve ter pelo menos 2 caracteres', 'error');
+            return;
+        }
+
+        if (name.length > 100) {
+            showToast('Nome do item muito longo (máx 100 caracteres)', 'error');
+            return;
+        }
+
+        try {
+            isSubmittingItem = true;
+            submitBtn.disabled = true;
+
+            fetch(`/shopping/lists/${listId}/items`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': getCsrfToken()
+                },
+                body: JSON.stringify({ 
+                    shoppingListId: listId, 
+                    name, 
+                    quantity: quantity || null, 
+                    category 
+                })
+            })
+            .then(res => {
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                return res.json();
+            })
+            .then(data => {
+                if (data.success) {
+                    showToast('Item adicionado ✓', 'success');
+                    document.getElementById('itemName').value = '';
+                    document.getElementById('itemQuantity').value = '';
+                    document.getElementById('itemCategory').value = 'Outros';
+                    updateProgress();
+                    // Reload to show new item in category
+                    setTimeout(() => location.reload(), 800);
+                } else {
+                    throw new Error(data.message || 'Erro desconhecido');
+                }
+            })
+            .catch(error => {
+                console.error('Add error:', error);
+                showToast('Erro: ' + error.message, 'error');
+            })
+            .finally(() => {
+                isSubmittingItem = false;
+                submitBtn.disabled = false;
+            });
+        } catch (error) {
+            console.error('Fatal error:', error);
+            showToast('Erro ao adicionar item', 'error');
+            isSubmittingItem = false;
+            submitBtn.disabled = false;
+        }
+    }
+
+    // 🔧 Clear checked items with CSRF + error handling
+    function clearChecked() {
+        if (confirm('Limpar todos os itens marcados? Esta ação não pode ser desfeita.')) {
+            try {
+                fetch(`/shopping/lists/${listId}/checked`, {
+                    method: 'DELETE',
+                    headers: {
+                        'X-CSRF-Token': getCsrfToken()
+                    }
+                })
+                .then(res => {
+                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                    return res.json();
+                })
+                .then(data => {
+                    if (data.success) {
+                        showToast('Itens marcados removidos ✓', 'success');
+                        setTimeout(() => location.reload(), 800);
+                    } else {
+                        throw new Error(data.message || 'Erro desconhecido');
+                    }
+                })
+                .catch(error => {
+                    console.error('Clear error:', error);
+                    showToast('Erro: ' + error.message, 'error');
+                });
+            } catch (error) {
+                console.error('Fatal error:', error);
+                showToast('Erro ao limpar itens', 'error');
+            }
+        }
+    }
+
+    // 🔧 Import from diet with CSRF + error handling
+    function importFromDiet() {
+        try {
+            fetch('/shopping/import-from-diet', {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-Token': getCsrfToken()
+                }
+            })
+            .then(res => {
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                return res.json();
+            })
+            .then(data => {
+                if (data.success) {
+                    showToast(`${data.count || 0} itens importados! ✅`, 'success');
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    throw new Error(data.message || 'Erro desconhecido');
+                }
+            })
+            .catch(error => {
+                console.error('Import error:', error);
+                showToast('Erro: ' + error.message, 'error');
+            });
+        } catch (error) {
+            console.error('Fatal error:', error);
+            showToast('Erro ao importar itens', 'error');
+        }
+    }
+
+    // 🔧 Create new list with CSRF + error handling
+    function newList() {
+        try {
+            fetch('/shopping/lists', {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-Token': getCsrfToken()
+                }
+            })
+            .then(res => {
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                return res.json();
+            })
+            .then(data => {
+                if (data.success) {
+                    showToast('Nova lista criada ✓', 'success');
+                    setTimeout(() => location.reload(), 800);
+                } else {
+                    throw new Error(data.message || 'Erro desconhecido');
+                }
+            })
+            .catch(error => {
+                console.error('New list error:', error);
+                showToast('Erro: ' + error.message, 'error');
+            });
+        } catch (error) {
+            console.error('Fatal error:', error);
+            showToast('Erro ao criar lista', 'error');
+        }
+    }
+
+    // 🔧 Update progress bar
+    function updateProgress() {
+        const checked = document.querySelectorAll('.shopping-item.checked').length;
+        const total = document.querySelectorAll('.shopping-item').length;
+        document.getElementById('progress').textContent = `${checked} de ${total} itens comprados`;
+        document.getElementById('progressFill').style.width = `${total > 0 ? (checked / total * 100) : 0}%`;
+    }
+</script>

@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Test-NetConnection -ComputerName localhost -Port 5432 -WarningAction SilentlyContinue)",
+      "PowerShell(Get-NetTCPConnection -LocalPort 3010,3016 -State Listen -ErrorAction SilentlyContinue)"
+    ]
+  }
+}
