@@ -110,6 +110,7 @@ async function findInviter(token) {
   );
   return result.rows[0] || null;
 }
+exports.findInviter = findInviter;
 
 /**
  * Display register page. Registration is invite-only: a valid token from an

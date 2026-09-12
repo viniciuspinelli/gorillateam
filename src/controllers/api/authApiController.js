@@ -1,6 +1,7 @@
 // API Auth Controller - Emite/valida tokens JWT para o app mobile (site continua usando sessão)
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const { findInviter } = require('../authController');
 
 const TOKEN_EXPIRY = '30d';
 
@@ -43,10 +44,21 @@ exports.login = async (req, res, next) => {
 
 exports.register = async (req, res, next) => {
   try {
-    const { username, password, confirmPassword, email } = req.body;
+    const { username, fullName, password, confirmPassword, email, token: inviteToken } = req.body;
 
-    if (!username || !password || !confirmPassword || !email) {
+    // Registration is invite-only (mirrors the web flow): a valid token from an
+    // instructor/admin's invite link is required, and the new user is linked to
+    // that inviter via instructorId.
+    const inviter = await findInviter(inviteToken);
+    if (!inviter) {
+      return res.status(400).json({ success: false, message: 'Link de convite inválido ou ausente. Peça um novo link ao seu instrutor.' });
+    }
+
+    if (!username || !fullName || !password || !confirmPassword || !email) {
       return res.status(400).json({ success: false, message: 'Todos os campos são obrigatórios' });
+    }
+    if (!fullName.trim()) {
+      return res.status(400).json({ success: false, message: 'Informe seu nome completo' });
     }
     if (username.length < 3 || username.length > 30) {
       return res.status(400).json({ success: false, message: 'O nome de usuário deve ter entre 3 e 30 caracteres' });
@@ -79,8 +91,8 @@ exports.register = async (req, res, next) => {
 
     const hashedPassword = await bcrypt.hash(password, 12);
     const result = await global.db.query(
-      'INSERT INTO "User" (username, password, role, email) VALUES ($1, $2, $3, $4) RETURNING id, username, role',
-      [safeUsername, hashedPassword, 'user', safeEmail]
+      'INSERT INTO "User" (username, "fullName", password, role, email, "instructorId") VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, username, role',
+      [safeUsername, fullName.trim(), hashedPassword, 'user', safeEmail, inviter.id]
     );
     const user = result.rows[0];
     const token = signToken(user);
