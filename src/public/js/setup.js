@@ -62,21 +62,21 @@ document.addEventListener('DOMContentLoaded', () => {
         const data = await res.json();
 
         if (data.sucesso) {
-          mensagem.textContent = '✅ Admin criado com sucesso! Redirecionando...';
+          mensagem.textContent = 'Admin criado com sucesso! Redirecionando...';
           mensagem.className = 'message sucesso';
 
           setTimeout(() => {
             window.location.href = '/auth/login';
           }, 2000);
         } else {
-          mensagem.textContent = '❌ ' + (data.erro || 'Erro ao criar admin');
+          mensagem.textContent = data.erro || 'Erro ao criar admin';
           mensagem.className = 'message erro';
           btnSubmit.disabled = false;
           btnSubmit.textContent = 'Criar Admin';
         }
       } catch (err) {
         console.error('Erro:', err);
-        mensagem.textContent = '❌ Erro de conexão. Tente novamente.';
+        mensagem.textContent = 'Erro de conexão. Tente novamente.';
         mensagem.className = 'message erro';
         btnSubmit.disabled = false;
         btnSubmit.textContent = 'Criar Admin';

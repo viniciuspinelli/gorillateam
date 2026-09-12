@@ -1,7 +1,10 @@
 <div class="admin-page">
-    <div class="page-header">
+    <div class="page-header" style="display:flex; align-items:center; gap:14px; border-bottom:1px solid var(--border-subtle);">
+        <span style="width:40px; height:40px; border-radius:var(--radius-md); background:var(--accent-muted); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent-primary)" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+        </span>
         <div>
-            <h1>📚 Biblioteca de Planos</h1>
+            <h1 style="margin-bottom:2px;">Biblioteca de Planos</h1>
             <p class="page-subtitle">Templates que podem ser atribuídos a qualquer aluno</p>
         </div>
     </div>
@@ -9,9 +12,15 @@
     <div class="admin-detail-grid">
         <!-- ===== WORKOUT TEMPLATES ===== -->
         <div class="admin-detail-section">
-            <div class="admin-section-header">
-                <h2>🏋️ Templates de Treino</h2>
-                <button class="btn btn-sm btn-primary" onclick="toggleWkCreatePanel()">➕ Novo Template</button>
+            <div class="section-card-header">
+                <div class="section-card-title">
+                    <span class="section-icon-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/></svg></span>
+                    <h2>Templates de Treino</h2>
+                </div>
+                <button class="btn btn-sm btn-primary" onclick="toggleWkCreatePanel()">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    Novo Template
+                </button>
             </div>
 
             <!-- Inline: criar template de treino -->
@@ -48,67 +57,16 @@
                                     <span class="plan-badge" id="wk-excnt-<%= t.id %>"><%= t.exercise_count %> exercícios</span>
                                 </div>
                                 <div style="display:flex;gap:6px;align-items:center;">
-                                    <button class="btn btn-sm btn-secondary" id="wk-btn-edit-<%= t.id %>" onclick="toggleWkExPanel(<%= t.id %>)">Editar</button>
-                                    <button class="btn btn-sm btn-danger" onclick="deleteTemplate('workout', <%= t.id %>, '<%= t.name.replace(/'/g, "\\'") %>')">🗑️</button>
-                                </div>
-                            </div>
-                            <!-- Exercises panel -->
-                            <div class="plan-exercises-panel" id="wk-ex-panel-<%= t.id %>">
-                                <div class="exercises-panel-header">
-                                    <span class="exercises-section-label">EXERCÍCIOS</span>
-                                    <button class="btn-icon" onclick="toggleWkExPanel(<%= t.id %>)">
-                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                                    <a href="/workouts/plans" class="btn btn-sm btn-secondary" title="Editar grupos musculares e exercícios em Gerenciar Planos">Editar</a>
+                                    <button class="btn btn-sm btn-danger" onclick="deleteTemplate('workout', <%= t.id %>, '<%= t.name.replace(/'/g, "\\'") %>')" title="Remover" aria-label="Remover template">
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
                                     </button>
-                                </div>
-                                <div id="wk-ex-list-<%= t.id %>"></div>
-                                <!-- Add exercise -->
-                                <div class="add-exercise-details" id="wk-add-details-<%= t.id %>">
-                                    <button class="add-exercise-summary" type="button" onclick="toggleWkAddEx(<%= t.id %>)">
-                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                                        Adicionar Exercício
-                                    </button>
-                                    <div class="add-exercise-body" id="wk-add-form-<%= t.id %>" style="display:none">
-                                        <form onsubmit="submitWkAddEx(event, <%= t.id %>)">
-                                            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-                                            <div class="form-grid-3">
-                                                <div class="form-group">
-                                                    <label>Nome *</label>
-                                                    <input type="text" name="name" placeholder="ex: Supino" required>
-                                                </div>
-                                                <div class="form-group">
-                                                    <label>Séries *</label>
-                                                    <input type="number" name="sets" placeholder="4" min="1" max="20" required>
-                                                </div>
-                                                <div class="form-group">
-                                                    <label>Reps *</label>
-                                                    <input type="text" name="reps" placeholder="8-12" required>
-                                                </div>
-                                            </div>
-                                            <div class="form-grid-3">
-                                                <div class="form-group">
-                                                    <label>Carga</label>
-                                                    <input type="text" name="weight" placeholder="60kg">
-                                                </div>
-                                                <div class="form-group">
-                                                    <label>Descanso (seg)</label>
-                                                    <input type="number" name="restSeconds" placeholder="60" min="0">
-                                                </div>
-                                                <div class="form-group">
-                                                    <label>Notas</label>
-                                                    <input type="text" name="notes" placeholder="Dicas...">
-                                                </div>
-                                            </div>
-                                            <div class="inline-edit-actions">
-                                                <button type="submit" class="btn btn-primary btn-sm">Adicionar</button>
-                                                <button type="button" class="btn btn-secondary btn-sm" onclick="toggleWkAddEx(<%= t.id %>)">Cancelar</button>
-                                            </div>
-                                        </form>
-                                    </div>
                                 </div>
                             </div>
                         </div>
                     <% }); %>
                 </div>
+                <span class="section-hint">Grupos musculares e exercícios são gerenciados em "Gerenciar Planos".</span>
             <% } else { %>
                 <p class="empty-hint" id="wk-empty-hint">Nenhum template de treino na biblioteca.</p>
             <% } %>
@@ -116,9 +74,15 @@
 
         <!-- ===== DIET TEMPLATES ===== -->
         <div class="admin-detail-section">
-            <div class="admin-section-header">
-                <h2>🥗 Templates de Dieta</h2>
-                <button class="btn btn-sm btn-primary" onclick="toggleDtCreatePanel()">➕ Novo Template</button>
+            <div class="section-card-header">
+                <div class="section-card-title">
+                    <span class="section-icon-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 1 0 10 10H12V2z"/><path d="M12 2a10 10 0 0 1 10 10"/></svg></span>
+                    <h2>Templates de Dieta</h2>
+                </div>
+                <button class="btn btn-sm btn-primary" onclick="toggleDtCreatePanel()">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    Novo Template
+                </button>
             </div>
 
             <!-- Inline: criar template de dieta -->
@@ -151,7 +115,9 @@
                                 </div>
                                 <div style="display:flex;gap:6px;align-items:center;">
                                     <button class="btn btn-sm btn-secondary" id="dt-btn-edit-<%= t.id %>" onclick="toggleDtMealPanel(<%= t.id %>)">Editar</button>
-                                    <button class="btn btn-sm btn-danger" onclick="deleteTemplate('diet', <%= t.id %>, '<%= t.name.replace(/'/g, "\\'") %>')">🗑️</button>
+                                    <button class="btn btn-sm btn-danger" onclick="deleteTemplate('diet', <%= t.id %>, '<%= t.name.replace(/'/g, "\\'") %>')" title="Remover" aria-label="Remover template">
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+                                    </button>
                                 </div>
                             </div>
                             <!-- Meals panel -->
@@ -244,137 +210,6 @@ async function submitCreateWk(e) {
         else showToast(d.message || 'Erro', 'error');
     } catch (_) { showToast('Erro de conexão', 'error'); }
     finally { btn.disabled = false; btn.textContent = 'Criar Template'; }
-}
-
-// — Exercises panel —
-let _wkOpenId = null;
-
-function toggleWkExPanel(id) {
-    const panel = document.getElementById('wk-ex-panel-' + id);
-    const editBtn = document.getElementById('wk-btn-edit-' + id);
-    if (_wkOpenId && _wkOpenId !== id) {
-        const prev = document.getElementById('wk-ex-panel-' + _wkOpenId);
-        const prevBtn = document.getElementById('wk-btn-edit-' + _wkOpenId);
-        if (prev) prev.classList.remove('open');
-        if (prevBtn) prevBtn.textContent = 'Editar';
-        _wkOpenId = null;
-    }
-    const isOpen = panel.classList.toggle('open');
-    if (isOpen) { editBtn.textContent = 'Fechar'; _wkOpenId = id; loadWkExercises(id); }
-    else { editBtn.textContent = 'Editar'; _wkOpenId = null; }
-}
-
-async function loadWkExercises(planId) {
-    const list = document.getElementById('wk-ex-list-' + planId);
-    list.innerHTML = '<p class="exercises-loading">Carregando...</p>';
-    try {
-        const r = await fetch('/workouts/plans/' + planId + '/exercises');
-        const d = await r.json();
-        if (!d.success || d.exercises.length === 0) {
-            list.innerHTML = '<p class="no-exercises-msg">Nenhum exercício ainda</p>';
-            return;
-        }
-        list.innerHTML = d.exercises.map((ex, i) =>
-            '<div class="exercise-row" id="wk-exrow-' + ex.id + '">' +
-            '<div class="exercise-row-number">' + (i + 1) + '</div>' +
-            '<div class="exercise-row-info">' +
-                '<span class="exercise-row-name">' + escH(ex.name) + '</span>' +
-                '<div class="exercise-row-meta">' +
-                    '<span class="meta-pill">' + ex.sets + 'x' + ex.reps + '</span>' +
-                    (ex.weight ? '<span class="meta-pill">' + escH(ex.weight) + '</span>' : '') +
-                    (ex.restSeconds ? '<span class="meta-pill">' + ex.restSeconds + 's</span>' : '') +
-                    (ex.notes ? '<span class="meta-pill meta-notes">' + escH(ex.notes) + '</span>' : '') +
-                '</div>' +
-            '</div>' +
-            '<div class="exercise-row-actions">' +
-                '<button class="btn-icon" onclick="showWkExEdit(' + ex.id + ',' + planId + ',\'' + esc(ex.name) + '\',' + ex.sets + ',\'' + esc(ex.reps) + '\',\'' + esc(ex.weight || '') + '\',' + (ex.restSeconds || 0) + ',\'' + esc(ex.notes || '') + '\')" title="Editar">' +
-                    '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>' +
-                '</button>' +
-                '<button class="btn-icon btn-icon-danger" onclick="deleteWkEx(' + ex.id + ',' + planId + ',\'' + esc(ex.name) + '\')" title="Deletar">' +
-                    '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>' +
-                '</button>' +
-            '</div>' +
-            '</div>'
-        ).join('');
-    } catch (_) { list.innerHTML = '<p class="error-msg">Erro ao carregar</p>'; }
-}
-
-function showWkExEdit(id, planId, name, sets, reps, weight, rest, notes) {
-    const row = document.getElementById('wk-exrow-' + id);
-    row.innerHTML =
-        '<form class="exercise-inline-edit" onsubmit="saveWkExInline(event,' + id + ',' + planId + ')">' +
-        '<div class="inline-edit-grid">' +
-            '<input class="inline-input inline-input-wide" type="text" name="name" value="' + escH(name) + '" placeholder="Nome" required>' +
-            '<input class="inline-input" type="number" name="sets" value="' + sets + '" min="1" max="20" placeholder="Séries" required>' +
-            '<input class="inline-input" type="text" name="reps" value="' + escH(reps) + '" placeholder="Reps" required>' +
-            '<input class="inline-input" type="text" name="weight" value="' + escH(weight) + '" placeholder="Carga">' +
-            '<input class="inline-input" type="number" name="restSeconds" value="' + rest + '" min="0" placeholder="Descanso">' +
-            '<input class="inline-input inline-input-wide" type="text" name="notes" value="' + escH(notes) + '" placeholder="Notas">' +
-        '</div>' +
-        '<div class="inline-edit-actions">' +
-            '<button type="submit" class="btn btn-primary btn-sm">Salvar</button>' +
-            '<button type="button" class="btn btn-secondary btn-sm" onclick="loadWkExercises(' + planId + ')">Cancelar</button>' +
-        '</div>' +
-        '</form>';
-}
-
-async function saveWkExInline(e, exId, planId) {
-    e.preventDefault();
-    const fd = new FormData(e.target);
-    try {
-        const r = await fetch('/workouts/exercises/' + exId, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
-            body: JSON.stringify({ name: fd.get('name'), sets: parseInt(fd.get('sets')), reps: fd.get('reps'), weight: fd.get('weight') || null, restSeconds: fd.get('restSeconds') ? parseInt(fd.get('restSeconds')) : null, notes: fd.get('notes') || null })
-        });
-        const d = await r.json();
-        if (d.success) { showToast('Exercício atualizado', 'success'); loadWkExercises(planId); }
-        else showToast(d.message || 'Erro', 'error');
-    } catch (_) { showToast('Erro de conexão', 'error'); }
-}
-
-function toggleWkAddEx(planId) {
-    const form = document.getElementById('wk-add-form-' + planId);
-    form.style.display = form.style.display === 'none' ? 'block' : 'none';
-    if (form.style.display === 'block') form.querySelector('input[name="name"]').focus();
-}
-
-async function submitWkAddEx(e, planId) {
-    e.preventDefault();
-    const fd = new FormData(e.target);
-    const btn = e.target.querySelector('[type="submit"]');
-    btn.disabled = true;
-    try {
-        const r = await fetch('/workouts/plans/' + planId + '/exercises', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
-            body: JSON.stringify({ name: fd.get('name'), sets: parseInt(fd.get('sets')), reps: fd.get('reps'), weight: fd.get('weight') || null, restSeconds: fd.get('restSeconds') ? parseInt(fd.get('restSeconds')) : null, notes: fd.get('notes') || null })
-        });
-        const d = await r.json();
-        if (d.success) {
-            e.target.reset();
-            document.getElementById('wk-add-form-' + planId).style.display = 'none';
-            showToast('Exercício adicionado!', 'success');
-            loadWkExercises(planId);
-            const badge = document.getElementById('wk-excnt-' + planId);
-            if (badge) { const n = parseInt(badge.textContent) + 1; badge.textContent = n + ' exercício' + (n !== 1 ? 's' : ''); }
-        } else showToast(d.message || 'Erro', 'error');
-    } catch (_) { showToast('Erro de conexão', 'error'); }
-    finally { btn.disabled = false; }
-}
-
-async function deleteWkEx(exId, planId, name) {
-    if (!confirm('Remover exercício "' + name + '"?')) return;
-    try {
-        const r = await fetch('/workouts/exercises/' + exId, { method: 'DELETE', headers: { 'X-CSRF-Token': csrfToken } });
-        const d = await r.json();
-        if (d.success) {
-            showToast('Exercício removido', 'success');
-            loadWkExercises(planId);
-            const badge = document.getElementById('wk-excnt-' + planId);
-            if (badge) { const n = Math.max(0, parseInt(badge.textContent) - 1); badge.textContent = n + ' exercício' + (n !== 1 ? 's' : ''); }
-        } else showToast(d.message || 'Erro', 'error');
-    } catch (_) { showToast('Erro de conexão', 'error'); }
 }
 
 // ══════════════════════════════════════════════════════════════════

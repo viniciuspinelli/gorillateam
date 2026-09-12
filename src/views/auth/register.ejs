@@ -1,76 +1,105 @@
 <div class="login-page">
     <div class="login-card">
         <div class="login-logo">
-            <span class="login-logo-icon">⚡</span>
-            <span class="login-logo-text">GymDiet</span>
+            <img src="/logo.png" alt="GymDiet" class="login-logo-img">
         </div>
-        <p class="login-subtitle">Criar Nova Conta</p>
 
-        <% if (typeof error !== 'undefined' && error) { %>
-            <div class="login-alert">
+        <% if (typeof invalidInvite !== 'undefined' && invalidInvite) { %>
+            <p class="login-subtitle">Cadastro por Convite</p>
+            <div class="login-alert" style="background-color: var(--bg-tertiary); border-color: var(--border-default); color: var(--text-secondary);">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                <%= error %>
+                Este link de convite é inválido ou expirou. Peça ao seu instrutor um novo link de cadastro.
             </div>
+            <p class="login-hint">Já tem conta? <a href="/auth/login" style="color: var(--accent-primary);">Entrar</a></p>
+        <% } else { %>
+            <p class="login-subtitle">Criar Nova Conta</p>
+
+            <% if (inviterName) { %>
+                <div class="login-alert" style="background-color: var(--accent-muted); border-color: rgba(249,115,22,0.3); color: var(--accent-light);">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+                    Convite de <strong><%= inviterName %></strong>
+                </div>
+            <% } %>
+
+            <% if (typeof error !== 'undefined' && error) { %>
+                <div class="login-alert">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                    <%= error %>
+                </div>
+            <% } %>
+
+            <form method="POST" action="/auth/register" class="login-form">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                <input type="hidden" name="token" value="<%= token %>">
+
+                <div class="login-field">
+                    <label for="fullName">Nome Completo</label>
+                    <input
+                        type="text"
+                        id="fullName"
+                        name="fullName"
+                        placeholder="Seu nome completo"
+                        required
+                        autofocus
+                        maxlength="255"
+                    >
+                </div>
+
+                <div class="login-field">
+                    <label for="username">Usuário</label>
+                    <input
+                        type="text"
+                        id="username"
+                        name="username"
+                        placeholder="seunome"
+                        required
+                        maxlength="50"
+                    >
+                </div>
+
+                <div class="login-field">
+                    <label for="email">E-mail <span style="font-size:11px;color:var(--text-tertiary);">(para recuperação de senha)</span></label>
+                    <input
+                        type="email"
+                        id="email"
+                        name="email"
+                        placeholder="voce@email.com"
+                        required
+                    >
+                </div>
+
+                <div class="login-field">
+                    <label for="password">Senha</label>
+                    <input
+                        type="password"
+                        id="password"
+                        name="password"
+                        placeholder="••••••••"
+                        required
+                        minlength="8"
+                    >
+                </div>
+
+                <div class="login-field">
+                    <label for="confirmPassword">Confirmar Senha</label>
+                    <input
+                        type="password"
+                        id="confirmPassword"
+                        name="confirmPassword"
+                        placeholder="••••••••"
+                        required
+                        minlength="8"
+                    >
+                </div>
+
+                <button type="submit" class="btn btn-primary login-btn">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+                    Criar Conta
+                </button>
+            </form>
+
+            <p class="login-hint">Já tem conta? <a href="/auth/login" style="color: var(--accent-primary);">Entrar</a></p>
         <% } %>
-
-        <form method="POST" action="/auth/register" class="login-form">
-            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-
-            <div class="login-field">
-                <label for="username">Usuário</label>
-                <input
-                    type="text"
-                    id="username"
-                    name="username"
-                    placeholder="seunome"
-                    required
-                    autofocus
-                    maxlength="50"
-                >
-            </div>
-
-            <div class="login-field">
-                <label for="email">E-mail <span style="font-size:11px;color:var(--text-muted);">(para recuperação de senha)</span></label>
-                <input
-                    type="email"
-                    id="email"
-                    name="email"
-                    placeholder="voce@email.com"
-                    required
-                >
-            </div>
-
-            <div class="login-field">
-                <label for="password">Senha</label>
-                <input
-                    type="password"
-                    id="password"
-                    name="password"
-                    placeholder="••••••••"
-                    required
-                    minlength="6"
-                >
-            </div>
-
-            <div class="login-field">
-                <label for="confirmPassword">Confirmar Senha</label>
-                <input
-                    type="password"
-                    id="confirmPassword"
-                    name="confirmPassword"
-                    placeholder="••••••••"
-                    required
-                    minlength="6"
-                >
-            </div>
-
-            <button type="submit" class="btn btn-primary login-btn">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
-                Criar Conta
-            </button>
-        </form>
-
-        <p class="login-hint">Já tem conta? <a href="/auth/login" style="color: var(--accent-primary);">Entrar</a></p>
     </div>
 </div>
 
@@ -114,20 +143,14 @@
         margin-bottom: 8px;
     }
 
-    .login-logo-icon {
-        font-size: 28px;
-        line-height: 1;
-    }
-
-    .login-logo-text {
-        font-size: 26px;
-        font-weight: 700;
-        color: var(--accent-primary);
+    .login-logo-img {
+        height: 52px;
+        width: auto;
     }
 
     .login-subtitle {
         text-align: center;
-        color: var(--text-muted);
+        color: var(--text-tertiary);
         font-size: 14px;
         margin-bottom: 28px;
     }
@@ -196,7 +219,7 @@
     .login-hint {
         text-align: center;
         font-size: 13px;
-        color: var(--text-muted);
+        color: var(--text-tertiary);
         margin-top: 20px;
     }
 </style>

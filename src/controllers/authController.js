@@ -99,75 +99,102 @@ exports.postLogin = async (req, res, next) => {
 };
 
 /**
- * Display register page
+ * Look up which instructor/admin a registration invite token belongs to.
+ * Returns null when the token is missing or doesn't match anyone.
  */
-exports.getRegister = (req, res) => {
-  if (req.session.user) {
-    return res.redirect('/workouts');
+async function findInviter(token) {
+  if (!token) return null;
+  const result = await global.db.query(
+    `SELECT id, username, "fullName" FROM "User" WHERE "inviteToken" = $1 AND role IN ('instructor', 'admin')`,
+    [token]
+  );
+  return result.rows[0] || null;
+}
+
+/**
+ * Display register page. Registration is invite-only: a valid token from an
+ * instructor/admin's invite link (src/views/admin/users.ejs) is required.
+ */
+exports.getRegister = async (req, res, next) => {
+  try {
+    if (req.session.user) {
+      return res.redirect('/workouts');
+    }
+    const csrfToken = req.csrfToken ? req.csrfToken() : '';
+    const token = req.params.token || null;
+    const inviter = await findInviter(token);
+
+    res.render('auth/register', {
+      title: 'Criar Conta',
+      error: null,
+      csrfToken,
+      token: inviter ? token : null,
+      inviterName: inviter ? (inviter.fullName || inviter.username) : null,
+      invalidInvite: !inviter,
+    });
+  } catch (err) {
+    next(err);
   }
-  const csrfToken = req.csrfToken ? req.csrfToken() : '';
-  res.render('auth/register', {
-    title: 'Criar Conta',
-    csrfToken,
-  });
 };
 
 /**
- * Handle register submission
+ * Handle register submission. Requires a valid invite token; the new user
+ * is linked to the inviting instructor/admin via instructorId.
  */
 exports.postRegister = async (req, res, next) => {
   try {
-    const { username, password, confirmPassword, email } = req.body;
+    const { username, fullName, password, confirmPassword, email, token } = req.body;
     const csrfToken = req.csrfToken ? req.csrfToken() : '';
 
-    if (!username || !password || !confirmPassword || !email) {
+    const renderError = (error) => res.status(400).render('auth/register', {
+      title: 'Criar Conta',
+      error,
+      csrfToken,
+      token: token || null,
+      inviterName: null,
+      invalidInvite: false,
+    });
+
+    const inviter = await findInviter(token);
+    if (!inviter) {
       return res.status(400).render('auth/register', {
         title: 'Criar Conta',
-        error: 'Todos os campos são obrigatórios',
+        error: null,
         csrfToken,
+        token: null,
+        inviterName: null,
+        invalidInvite: true,
       });
+    }
+
+    if (!username || !fullName || !password || !confirmPassword || !email) {
+      return renderError('Todos os campos são obrigatórios');
+    }
+
+    if (!fullName.trim()) {
+      return renderError('Informe seu nome completo');
     }
 
     // Validate username length and format
     if (username.length < 3 || username.length > 30) {
-      return res.status(400).render('auth/register', {
-        title: 'Criar Conta',
-        error: 'O nome de usuário deve ter entre 3 e 30 caracteres',
-        csrfToken,
-      });
+      return renderError('O nome de usuário deve ter entre 3 e 30 caracteres');
     }
 
     if (!/^[a-zA-Z0-9_.-]+$/.test(username)) {
-      return res.status(400).render('auth/register', {
-        title: 'Criar Conta',
-        error: 'O nome de usuário só pode conter letras, números, _, . e -',
-        csrfToken,
-      });
+      return renderError('O nome de usuário só pode conter letras, números, _, . e -');
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email.trim())) {
-      return res.status(400).render('auth/register', {
-        title: 'Criar Conta',
-        error: 'Informe um e-mail válido',
-        csrfToken,
-      });
+      return renderError('Informe um e-mail válido');
     }
 
     if (password !== confirmPassword) {
-      return res.status(400).render('auth/register', {
-        title: 'Criar Conta',
-        error: 'As senhas não coincidem',
-        csrfToken,
-      });
+      return renderError('As senhas não coincidem');
     }
 
     if (password.length < 8) {
-      return res.status(400).render('auth/register', {
-        title: 'Criar Conta',
-        error: 'A senha deve ter pelo menos 8 caracteres',
-        csrfToken,
-      });
+      return renderError('A senha deve ter pelo menos 8 caracteres');
     }
 
     const safeUsername = username.trim().toLowerCase();
@@ -178,11 +205,7 @@ exports.postRegister = async (req, res, next) => {
     );
 
     if (existing.rows.length > 0) {
-      return res.status(400).render('auth/register', {
-        title: 'Criar Conta',
-        error: 'Nome de usuário já está em uso',
-        csrfToken,
-      });
+      return renderError('Nome de usuário já está em uso');
     }
 
     const safeEmail = email.trim().toLowerCase();
@@ -191,17 +214,13 @@ exports.postRegister = async (req, res, next) => {
       [safeEmail]
     );
     if (emailExists.rows.length > 0) {
-      return res.status(400).render('auth/register', {
-        title: 'Criar Conta',
-        error: 'Este e-mail já está em uso',
-        csrfToken,
-      });
+      return renderError('Este e-mail já está em uso');
     }
 
     const hashedPassword = await bcrypt.hash(password, 12);
     const result = await global.db.query(
-      'INSERT INTO "User" (username, password, role, email) VALUES ($1, $2, $3, $4) RETURNING id, username, role',
-      [safeUsername, hashedPassword, 'user', safeEmail]
+      'INSERT INTO "User" (username, "fullName", password, role, email, "instructorId") VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, username, role',
+      [safeUsername, fullName.trim(), hashedPassword, 'user', safeEmail, inviter.id]
     );
 
     const user = result.rows[0];
@@ -441,7 +460,7 @@ exports.postResetPassword = async (req, res, next) => {
 
     const hashed = await bcrypt.hash(password, 12);
     await global.db.query(
-      `UPDATE "User" SET password = $1, "resetPasswordToken" = NULL, "resetPasswordExpiry" = NULL WHERE id = $2`,
+      `UPDATE "User" SET password = $1, "resetPasswordToken" = NULL, "resetPasswordExpiry" = NULL, "passwordChangedAt" = NOW() WHERE id = $2`,
       [hashed, result.rows[0].id]
     );
 

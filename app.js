@@ -82,6 +82,23 @@ pool.query(`
     ADD COLUMN IF NOT EXISTS "instructorId" INTEGER REFERENCES "User"(id) ON DELETE SET NULL
 `).catch(err => console.error('Migration instructor error:', err.message));
 
+// Auto-migrate: WorkoutSession.userId was missing ON DELETE CASCADE, which blocked
+// deleting any user who had ever started/completed a workout (FK violation).
+pool.query(`
+  ALTER TABLE "WorkoutSession" DROP CONSTRAINT IF EXISTS "WorkoutSession_userId_fkey"
+`).then(() => pool.query(`
+  ALTER TABLE "WorkoutSession" ADD CONSTRAINT "WorkoutSession_userId_fkey"
+    FOREIGN KEY ("userId") REFERENCES "User"(id) ON DELETE CASCADE
+`)).catch(err => console.error('Migration WorkoutSession cascade error:', err.message));
+
+// Auto-migrate: add invite token support (instructors/admins invite students via a shareable link)
+pool.query(`
+  ALTER TABLE "User"
+    ADD COLUMN IF NOT EXISTS "inviteToken" VARCHAR(64)
+`).then(() => pool.query(`
+  CREATE UNIQUE INDEX IF NOT EXISTS "user_invite_token_idx" ON "User" ("inviteToken") WHERE "inviteToken" IS NOT NULL
+`)).catch(err => console.error('Migration invite token error:', err.message));
+
 // ========================
 // MIDDLEWARE
 // ========================
@@ -407,6 +424,10 @@ async function initializeDatabase() {
     // NOTE: Privilege elevation via hardcoded username was removed (security fix).
     // The first admin is created through /setup on first run.
 
+    // Migration: track when the password last changed, so mobile JWTs issued
+    // before a reset/change can be rejected even though they haven't expired yet.
+    await client.query(`ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "passwordChangedAt" TIMESTAMP DEFAULT NOW();`);
+
     await client.query(`
       CREATE TABLE IF NOT EXISTS "Exercise" (
         id SERIAL PRIMARY KEY,
@@ -468,6 +489,43 @@ async function initializeDatabase() {
       );
     `);
 
+    // Muscle-group sessions within a workout program (e.g. "Hipertrofia 1" contains
+    // "Peito e Tríceps", "Costas e Bíceps", "Pernas"). Exercises belong to a group;
+    // assigning the parent WorkoutPlan to a student deep-copies every group inside it.
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS "WorkoutGroup" (
+        id SERIAL PRIMARY KEY,
+        "workoutPlanId" INTEGER NOT NULL REFERENCES "WorkoutPlan"(id) ON DELETE CASCADE,
+        name VARCHAR(255) NOT NULL,
+        "order" INTEGER DEFAULT 0,
+        "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    await client.query(`ALTER TABLE "Exercise" ADD COLUMN IF NOT EXISTS "workoutGroupId" INTEGER REFERENCES "WorkoutGroup"(id) ON DELETE CASCADE;`);
+    await client.query(`ALTER TABLE "WorkoutSession" ADD COLUMN IF NOT EXISTS "workoutGroupId" INTEGER REFERENCES "WorkoutGroup"(id) ON DELETE SET NULL;`);
+
+    // Backfill: every pre-existing WorkoutPlan gets one default group holding its
+    // existing exercises/sessions, so nothing created before this feature breaks.
+    await client.query(`
+      INSERT INTO "WorkoutGroup" ("workoutPlanId", name, "order")
+      SELECT wp.id, COALESCE(NULLIF(wp."dayOfWeek", ''), 'Treino Único'), 0
+      FROM "WorkoutPlan" wp
+      WHERE NOT EXISTS (SELECT 1 FROM "WorkoutGroup" wg WHERE wg."workoutPlanId" = wp.id);
+    `);
+    await client.query(`
+      UPDATE "Exercise" e
+      SET "workoutGroupId" = wg.id
+      FROM "WorkoutGroup" wg
+      WHERE e."workoutGroupId" IS NULL AND wg."workoutPlanId" = e."workoutPlanId" AND wg."order" = 0;
+    `);
+    await client.query(`
+      UPDATE "WorkoutSession" ws
+      SET "workoutGroupId" = wg.id
+      FROM "WorkoutGroup" wg
+      WHERE ws."workoutGroupId" IS NULL AND wg."workoutPlanId" = ws."workoutPlanId" AND wg."order" = 0;
+    `);
+
     await client.query(`
       CREATE TABLE IF NOT EXISTS "MealPlan" (
         id SERIAL PRIMARY KEY,
@@ -510,6 +568,24 @@ async function initializeDatabase() {
         fat DECIMAL(10, 2),
         notes TEXT,
         "order" INTEGER DEFAULT 0
+      );
+    `);
+
+    // Substitute options for a MealFood (e.g. the main food is "Frango grelhado
+    // 120g"; options let the student swap it for "Patinho 115g" or "Tilápia 150g").
+    // Purely informational — only the parent MealFood counts toward meal totals.
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS "MealFoodOption" (
+        id SERIAL PRIMARY KEY,
+        "mealFoodId" INTEGER NOT NULL REFERENCES "MealFood"(id) ON DELETE CASCADE,
+        name VARCHAR(255) NOT NULL,
+        quantity VARCHAR(255),
+        calories INTEGER,
+        protein DECIMAL(10, 2),
+        carbs DECIMAL(10, 2),
+        fat DECIMAL(10, 2),
+        "order" INTEGER DEFAULT 0,
+        "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
 

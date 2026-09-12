@@ -123,30 +123,30 @@
         <% if (user) { %>
             <nav class="bottom-nav">
                 <a href="/workouts" class="nav-tab <%= title === 'Treinos' ? 'active' : '' %>">
-                    <span>🏋️</span>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>
                     <span>Treinos</span>
                 </a>
                 <a href="/diet" class="nav-tab <%= title === 'Dieta' ? 'active' : '' %>">
-                    <span>🥗</span>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 1 0 10 10H12V2z"/><path d="M12 2a10 10 0 0 1 10 10"/></svg>
                     <span>Dieta</span>
                 </a>
                 <a href="/shopping" class="nav-tab <%= title === 'Lista de Compras' ? 'active' : '' %>">
-                    <span>🛒</span>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
                     <span>Compras</span>
                 </a>
                 <% if (user.role === 'admin' || user.role === 'instructor') { %>
                 <a href="/workouts/plans" class="nav-tab <%= title === 'Gerenciar Treinos' ? 'active' : '' %>">
-                    <span>📋</span>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
                     <span>Planos</span>
                 </a>
                 <% } %>
                 <a href="/workouts/history" class="nav-tab <%= title === 'Histórico de Treinos' ? 'active' : '' %>">
-                    <span>📊</span>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
                     <span>Histórico</span>
                 </a>
                 <% if (user.role === 'admin' || user.role === 'instructor') { %>
                 <a href="/admin" class="nav-tab <%= title === 'Painel Admin' || title === 'Meus Alunos' ? 'active' : '' %>">
-                    <span>⚡</span>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
                     <span><%= user.role === 'admin' ? 'Admin' : 'Painel' %></span>
                 </a>
                 <% } %>

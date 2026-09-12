@@ -1,39 +1,61 @@
 <div class="admin-page">
-    <div class="page-header">
-        <div>
-            <a href="/admin/users" class="btn-back">← Voltar</a>
-            <h1>
-                <span class="admin-user-avatar lg"><%= (targetUser.fullName || targetUser.username).charAt(0).toUpperCase() %></span>
-                <%= targetUser.fullName || targetUser.username %>
-                <% if (targetUser.fullName) { %><small style="font-size:0.55em;font-weight:400;color:var(--text-secondary,#888);margin-left:8px;">@<%= targetUser.username %></small><% } %>
-                <span class="admin-user-role <%= targetUser.role === 'admin' ? 'role-admin' : 'role-user' %>">
-                    <%= targetUser.role === 'admin' ? '⚡ Admin' : '👤 Aluno' %>
+    <a href="/admin/users" class="btn-back" style="margin-bottom:16px;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+        Voltar
+    </a>
+
+    <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; padding-bottom:20px; margin-bottom:24px; border-bottom:1px solid var(--border-subtle);">
+        <div style="display:flex; align-items:center; gap:16px;">
+            <span class="admin-user-avatar lg"><%= (targetUser.fullName || targetUser.username).charAt(0).toUpperCase() %></span>
+            <div>
+                <div style="display:flex; align-items:baseline; gap:10px; flex-wrap:wrap;">
+                    <span style="font-size:20px; font-weight:700; color:var(--text-primary);"><%= targetUser.fullName || targetUser.username %></span>
+                    <% if (targetUser.fullName) { %><span style="font-size:13px; color:var(--text-tertiary);">@<%= targetUser.username %></span><% } %>
+                </div>
+                <span class="role-badge <%= targetUser.role === 'admin' ? 'role-badge-admin' : '' %>" style="margin-top:6px;">
+                    <% if (targetUser.role === 'admin') { %>
+                        <svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>Admin
+                    <% } else { %>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Aluno
+                    <% } %>
                 </span>
-            </h1>
+            </div>
         </div>
-        <a href="/admin/users/<%= targetUser.id %>/edit" class="btn btn-secondary">✏️ Editar</a>
+        <a href="/admin/users/<%= targetUser.id %>/edit" class="btn btn-secondary">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+            Editar
+        </a>
     </div>
 
     <div class="admin-detail-grid">
         <!-- WORKOUTS SECTION -->
         <div class="admin-detail-section">
-            <div class="admin-section-header">
-                <h2>🏋️ Treinos Atribuídos</h2>
+            <div class="section-card-header">
+                <div class="section-card-title">
+                    <span class="section-icon-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/></svg></span>
+                    <h2>Treinos Atribuídos</h2>
+                </div>
                 <% if (workoutTemplates.length > 0) { %>
-                <button class="btn btn-sm btn-primary" onclick="togglePanel('assign-workout')">➕ Atribuir Treino</button>
+                <button class="btn btn-sm btn-primary" onclick="togglePanel('assign-workout')">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    Atribuir Treino
+                </button>
                 <% } %>
             </div>
 
             <!-- Assign workout panel -->
             <div id="assign-workout" class="assign-panel" style="display:none">
+                <span class="assign-panel-label">Selecione um template</span>
                 <select id="workoutTemplateSelect">
                     <option value="">Selecione um template...</option>
                     <% workoutTemplates.forEach(t => { %>
                         <option value="<%= t.id %>"><%= t.name %><%= t.dayOfWeek ? ' (' + t.dayOfWeek + ')' : '' %></option>
                     <% }); %>
                 </select>
-                <button class="btn btn-primary btn-sm" onclick="assignWorkout()">Atribuir</button>
-                <button class="btn btn-secondary btn-sm" onclick="togglePanel('assign-workout')">Cancelar</button>
+                <div class="assign-panel-actions">
+                    <button class="btn btn-primary btn-sm" onclick="assignWorkout()">Atribuir</button>
+                    <button class="btn btn-secondary btn-sm" onclick="togglePanel('assign-workout')">Cancelar</button>
+                </div>
             </div>
 
             <% if (workouts.length > 0) { %>
@@ -44,34 +66,49 @@
                                 <span class="assigned-plan-name"><%= w.name %></span>
                                 <% if (w.dayOfWeek) { %><span class="plan-badge"><%= w.dayOfWeek %></span><% } %>
                             </div>
-                            <button class="btn btn-sm btn-danger" onclick="removePlan('workout', <%= w.id %>)">🗑️</button>
+                            <button class="btn btn-sm btn-danger" onclick="removePlan('workout', <%= w.id %>)" title="Remover" aria-label="Remover treino">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+                            </button>
                         </div>
                     <% }); %>
                 </div>
             <% } else { %>
-                <p class="empty-hint">Nenhum treino atribuído ainda.</p>
+                <div class="section-empty">
+                    <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/></svg>
+                    <p>Nenhum treino atribuído ainda.</p>
+                    <p class="section-empty-hint">Use o botão acima para atribuir um treino.</p>
+                </div>
             <% } %>
         </div>
 
         <!-- DIETS SECTION -->
         <div class="admin-detail-section">
-            <div class="admin-section-header">
-                <h2>🥗 Dietas Atribuídas</h2>
+            <div class="section-card-header">
+                <div class="section-card-title">
+                    <span class="section-icon-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 1 0 10 10H12V2z"/><path d="M12 2a10 10 0 0 1 10 10"/></svg></span>
+                    <h2>Dietas Atribuídas</h2>
+                </div>
                 <% if (dietTemplates.length > 0) { %>
-                <button class="btn btn-sm btn-primary" onclick="togglePanel('assign-diet')">➕ Atribuir Dieta</button>
+                <button class="btn btn-sm btn-primary" onclick="togglePanel('assign-diet')">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    Atribuir Dieta
+                </button>
                 <% } %>
             </div>
 
             <!-- Assign diet panel -->
             <div id="assign-diet" class="assign-panel" style="display:none">
+                <span class="assign-panel-label">Selecione um template</span>
                 <select id="dietTemplateSelect">
                     <option value="">Selecione um template...</option>
                     <% dietTemplates.forEach(t => { %>
                         <option value="<%= t.id %>"><%= t.name %></option>
                     <% }); %>
                 </select>
-                <button class="btn btn-primary btn-sm" onclick="assignDiet()">Atribuir</button>
-                <button class="btn btn-secondary btn-sm" onclick="togglePanel('assign-diet')">Cancelar</button>
+                <div class="assign-panel-actions">
+                    <button class="btn btn-primary btn-sm" onclick="assignDiet()">Atribuir</button>
+                    <button class="btn btn-secondary btn-sm" onclick="togglePanel('assign-diet')">Cancelar</button>
+                </div>
             </div>
 
             <% if (diets.length > 0) { %>
@@ -82,19 +119,26 @@
                                 <span class="assigned-plan-name"><%= d.name %></span>
                                 <% if (d.isActive) { %><span class="plan-badge active">Ativa</span><% } %>
                             </div>
-                            <button class="btn btn-sm btn-danger" onclick="removePlan('diet', <%= d.id %>)">🗑️</button>
+                            <button class="btn btn-sm btn-danger" onclick="removePlan('diet', <%= d.id %>)" title="Remover" aria-label="Remover dieta">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+                            </button>
                         </div>
                     <% }); %>
                 </div>
             <% } else { %>
-                <p class="empty-hint">Nenhuma dieta atribuída ainda.</p>
+                <div class="section-empty">
+                    <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5"><path d="M12 2a10 10 0 1 0 10 10H12V2z"/><path d="M12 2a10 10 0 0 1 10 10"/></svg>
+                    <p>Nenhuma dieta atribuída ainda.</p>
+                    <p class="section-empty-hint">Use o botão acima para atribuir uma dieta.</p>
+                </div>
             <% } %>
         </div>
     </div>
 
     <% if (workoutTemplates.length === 0 && dietTemplates.length === 0) { %>
         <div class="alert alert-info" style="margin-top:20px">
-            📚 Sua biblioteca de templates está vazia. <a href="/admin/templates">Crie templates</a> para poder atribuir aos alunos.
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+            Sua biblioteca de templates está vazia. <a href="/admin/templates">Crie templates</a> para poder atribuir aos alunos.
         </div>
     <% } %>
 </div>
@@ -105,7 +149,7 @@ const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
 
 function togglePanel(id) {
     const el = document.getElementById(id);
-    el.style.display = el.style.display === 'none' ? 'flex' : 'none';
+    el.style.display = el.style.display === 'none' ? 'block' : 'none';
 }
 
 async function assignWorkout() {

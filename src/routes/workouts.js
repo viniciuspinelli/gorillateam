@@ -20,8 +20,17 @@ router.put('/plans/:planId', workoutController.updateWorkoutPlan);
 // DELETE /workouts/plans/:planId - delete workout plan
 router.delete('/plans/:planId', workoutController.deleteWorkoutPlan);
 
-// POST /workouts/plans/:planId/exercises - add exercise
-router.post('/plans/:planId/exercises', workoutController.addExercise);
+// POST /workouts/plans/:planId/groups - add a muscle-group session to a program
+router.post('/plans/:planId/groups', workoutController.createWorkoutGroup);
+
+// PUT /workouts/groups/:groupId - rename a muscle-group session
+router.put('/groups/:groupId', workoutController.updateWorkoutGroup);
+
+// DELETE /workouts/groups/:groupId - remove a muscle-group session
+router.delete('/groups/:groupId', workoutController.deleteWorkoutGroup);
+
+// POST /workouts/groups/:groupId/exercises - add exercise to a muscle-group session
+router.post('/groups/:groupId/exercises', workoutController.addExercise);
 
 // PUT /workouts/exercises/:exerciseId - update exercise
 router.put('/exercises/:exerciseId', workoutController.updateExercise);
@@ -29,8 +38,8 @@ router.put('/exercises/:exerciseId', workoutController.updateExercise);
 // DELETE /workouts/exercises/:exerciseId - delete exercise
 router.delete('/exercises/:exerciseId', workoutController.deleteExercise);
 
-// GET /workouts/plans/:planId/exercises - get exercises for plan (API)
-router.get('/plans/:planId/exercises', workoutController.getExercisesForPlan);
+// GET /workouts/groups/:groupId/exercises - get exercises for a muscle-group session (API)
+router.get('/groups/:groupId/exercises', workoutController.getExercisesForGroup);
 
 // GET /workouts/exercises/:exerciseId/images - list exercise images
 router.get('/exercises/:exerciseId/images', workoutController.listExerciseImages);
@@ -55,8 +64,8 @@ router.patch('/plans/:planId/toggle-template', workoutController.toggleTemplate)
 // GET /workouts - list all active workouts
 router.get('/', workoutController.getWorkouts);
 
-// POST /workouts/:id/start - start a new workout session
-router.post('/:id/start', workoutController.startWorkout);
+// POST /workouts/groups/:groupId/start - start a new session for a muscle-group
+router.post('/groups/:groupId/start', workoutController.startWorkout);
 
 // GET /workouts/session/:sessionId - active workout page
 router.get('/session/:sessionId', workoutController.getActiveWorkout);

@@ -51,6 +51,15 @@ exports.getDiet = async (req, res, next) => {
           fat: parseFloat(food.fat || 0),
         }));
 
+        // Substitute options (informational only, never counted in totals)
+        for (const food of foods) {
+          const optionsResult = await global.db.query(
+            `SELECT id, name, quantity, calories, protein, carbs, fat FROM "MealFoodOption" WHERE "mealFoodId" = $1 ORDER BY "order" ASC`,
+            [food.id]
+          );
+          food.options = optionsResult.rows;
+        }
+
         for (const food of foods) {
           totals.totalCalories += food.calories || 0;
           totals.totalProtein += food.protein || 0;
@@ -170,12 +179,72 @@ exports.addFood = async (req, res, next) => {
   } catch (error) { next(error); }
 };
 
+exports.updateFood = async (req, res, next) => {
+  try {
+    const foodId = Number.parseInt(req.params.foodId, 10);
+    const owner = await global.db.query(`SELECT mf.id FROM "MealFood" mf JOIN "Meal" m ON mf."mealId" = m.id JOIN "MealPlan" mp ON m."mealPlanId" = mp.id WHERE mf.id = $1 AND mp."userId" = $2 AND mp."isTemplate" = false`, [foodId, req.user.id]);
+    if (!owner.rows[0]) return res.status(404).json({ success: false, message: 'Alimento não encontrado' });
+    const { name, quantity, notes } = req.body;
+    if (!name || name.trim().length < 2) return res.status(400).json({ success: false, message: 'Nome do alimento inválido' });
+    const numbers = ['calories', 'protein', 'carbs', 'fat'].map((field) => {
+      const value = req.body[field];
+      return value === '' || value === null || value === undefined ? null : Number(value);
+    });
+    if (numbers.some((value) => value !== null && (!Number.isFinite(value) || value < 0))) return res.status(400).json({ success: false, message: 'Valores nutricionais inválidos' });
+    if (numbers.every((value) => value === null)) return res.status(400).json({ success: false, message: 'Adicione pelo menos uma informação nutricional' });
+    const result = await global.db.query(
+      `UPDATE "MealFood" SET name = $1, quantity = $2, calories = $3, protein = $4, carbs = $5, fat = $6, notes = $7 WHERE id = $8 RETURNING *`,
+      [name.trim(), quantity?.trim() || null, ...numbers, notes?.trim() || null, foodId]
+    );
+    res.json({ success: true, food: result.rows[0] });
+  } catch (error) { next(error); }
+};
+
 exports.deleteFood = async (req, res, next) => {
   try {
     const foodId = Number.parseInt(req.params.foodId, 10);
     const owner = await global.db.query(`SELECT mf.id FROM "MealFood" mf JOIN "Meal" m ON mf."mealId" = m.id JOIN "MealPlan" mp ON m."mealPlanId" = mp.id WHERE mf.id = $1 AND mp."userId" = $2 AND mp."isTemplate" = false`, [foodId, req.user.id]);
     if (!owner.rows[0]) return res.status(404).json({ success: false, message: 'Alimento não encontrado' });
     await global.db.query(`DELETE FROM "MealFood" WHERE id = $1`, [foodId]);
+    res.json({ success: true });
+  } catch (error) { next(error); }
+};
+
+exports.addFoodOption = async (req, res, next) => {
+  try {
+    const foodId = Number.parseInt(req.params.foodId, 10);
+    const owner = await global.db.query(`SELECT mf.id FROM "MealFood" mf JOIN "Meal" m ON mf."mealId" = m.id JOIN "MealPlan" mp ON m."mealPlanId" = mp.id WHERE mf.id = $1 AND mp."userId" = $2 AND mp."isTemplate" = false`, [foodId, req.user.id]);
+    if (!owner.rows[0]) return res.status(404).json({ success: false, message: 'Alimento não encontrado' });
+    const { name, quantity, calories, protein, carbs, fat } = req.body;
+    if (!name || name.trim().length < 2) return res.status(400).json({ success: false, message: 'Nome do substituto inválido' });
+    const numbers = ['calories', 'protein', 'carbs', 'fat'].map((field) => {
+      const value = req.body[field];
+      return value === '' || value === null || value === undefined ? null : Number(value);
+    });
+    if (numbers.some((value) => value !== null && (!Number.isFinite(value) || value < 0))) return res.status(400).json({ success: false, message: 'Valores nutricionais inválidos' });
+    const orderResult = await global.db.query(`SELECT COALESCE(MAX("order"), -1) + 1 AS next FROM "MealFoodOption" WHERE "mealFoodId" = $1`, [foodId]);
+    const result = await global.db.query(
+      `INSERT INTO "MealFoodOption" ("mealFoodId", name, quantity, calories, protein, carbs, fat, "order")
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+      [foodId, name.trim(), quantity?.trim() || null, ...numbers, orderResult.rows[0].next]
+    );
+    res.status(201).json({ success: true, option: result.rows[0] });
+  } catch (error) { next(error); }
+};
+
+exports.deleteFoodOption = async (req, res, next) => {
+  try {
+    const optionId = Number.parseInt(req.params.optionId, 10);
+    const owner = await global.db.query(
+      `SELECT o.id FROM "MealFoodOption" o
+       JOIN "MealFood" mf ON o."mealFoodId" = mf.id
+       JOIN "Meal" m ON mf."mealId" = m.id
+       JOIN "MealPlan" mp ON m."mealPlanId" = mp.id
+       WHERE o.id = $1 AND mp."userId" = $2 AND mp."isTemplate" = false`,
+      [optionId, req.user.id]
+    );
+    if (!owner.rows[0]) return res.status(404).json({ success: false, message: 'Substituto não encontrado' });
+    await global.db.query(`DELETE FROM "MealFoodOption" WHERE id = $1`, [optionId]);
     res.json({ success: true });
   } catch (error) { next(error); }
 };

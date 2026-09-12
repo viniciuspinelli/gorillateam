@@ -1,16 +1,25 @@
 <div class="shopping-page">
     <!-- Shopping List Header -->
     <div class="shopping-header">
-        <h1>🛒 Lista de Compras</h1>
+        <h1 style="display:flex; align-items:center; gap:10px;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent-primary)" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+            Lista de Compras
+        </h1>
         <div class="shopping-actions">
-            <button class="btn btn-secondary" onclick="importFromDiet()">
-                📥 Importar da Dieta (7 dias)
-            </button>
-            <button class="btn btn-secondary" onclick="clearChecked()">
-                🗑️ Limpar Marcados
+            <button class="btn btn-primary" onclick="importFromDiet()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Importar da Dieta (7 dias)
             </button>
             <button class="btn btn-secondary" onclick="newList()">
-                📋 Nova Lista
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Nova Lista
+            </button>
+            <button class="btn btn-secondary" onclick="checkAllItems()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                Selecionar Todos
+            </button>
+            <button class="btn-text-link" onclick="clearChecked()" style="align-self:center;">
+                Limpar marcados
             </button>
         </div>
     </div>
@@ -19,6 +28,7 @@
     <div class="progress-container">
         <div class="progress-label">
             <span id="progress"><%= checkedItems %> de <%= totalItems %> itens comprados</span>
+            <span class="progress-percent" id="progressPercent"><%= totalItems > 0 ? Math.round(checkedItems / totalItems * 100) : 0 %>%</span>
         </div>
         <div class="progress-bar">
             <div id="progressFill" class="progress-fill" style="width: <%= totalItems > 0 ? (checkedItems / totalItems * 100) : 0 %>%"></div>
@@ -49,8 +59,8 @@
                             <% } %>
                         </div>
 
-                        <button class="btn-delete" onclick="deleteItem(<%= item.id %>)">
-                            ✕
+                        <button class="btn-delete" onclick="deleteItem(<%= item.id %>)" title="Remover" aria-label="Remover item">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                         </button>
                     </div>
                 <% }); %>
@@ -72,7 +82,10 @@
                 <option value="Frutas">Frutas</option>
                 <option value="Outros">Outros</option>
             </select>
-            <button type="submit" class="btn btn-primary">+ Adicionar</button>
+            <button type="submit" class="btn btn-primary">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Adicionar
+            </button>
         </form>
     </div>
 </div>
@@ -140,7 +153,7 @@
                     if (data.success) {
                         document.querySelector(`[data-item-id="${itemId}"]`)?.remove();
                         updateProgress();
-                        showToast('Item removido ✓', 'success');
+                        showToast('Item removido', 'success');
                     } else {
                         throw new Error(data.message || 'Erro desconhecido');
                     }
@@ -201,7 +214,7 @@
             })
             .then(data => {
                 if (data.success) {
-                    showToast('Item adicionado ✓', 'success');
+                    showToast('Item adicionado', 'success');
                     document.getElementById('itemName').value = '';
                     document.getElementById('itemQuantity').value = '';
                     document.getElementById('itemCategory').value = 'Outros';
@@ -228,6 +241,42 @@
         }
     }
 
+    // 🔧 Select all items (mark all as checked) with CSRF + error handling
+    function checkAllItems() {
+        try {
+            fetch(`/shopping/lists/${listId}/check-all`, {
+                method: 'PATCH',
+                headers: {
+                    'X-CSRF-Token': getCsrfToken()
+                }
+            })
+            .then(res => {
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                return res.json();
+            })
+            .then(data => {
+                if (data.success) {
+                    document.querySelectorAll('.shopping-item').forEach(el => {
+                        el.classList.add('checked');
+                        const checkbox = el.querySelector('.item-checkbox');
+                        if (checkbox) checkbox.checked = true;
+                    });
+                    updateProgress();
+                    showToast('Todos os itens selecionados', 'success');
+                } else {
+                    throw new Error(data.message || 'Erro desconhecido');
+                }
+            })
+            .catch(error => {
+                console.error('Check all error:', error);
+                showToast('Erro: ' + error.message, 'error');
+            });
+        } catch (error) {
+            console.error('Fatal error:', error);
+            showToast('Erro ao selecionar itens', 'error');
+        }
+    }
+
     // 🔧 Clear checked items with CSRF + error handling
     function clearChecked() {
         if (confirm('Limpar todos os itens marcados? Esta ação não pode ser desfeita.')) {
@@ -244,7 +293,7 @@
                 })
                 .then(data => {
                     if (data.success) {
-                        showToast('Itens marcados removidos ✓', 'success');
+                        showToast('Itens marcados removidos', 'success');
                         setTimeout(() => location.reload(), 800);
                     } else {
                         throw new Error(data.message || 'Erro desconhecido');
@@ -276,7 +325,7 @@
             })
             .then(data => {
                 if (data.success) {
-                    showToast(`${data.count || 0} itens importados! ✅`, 'success');
+                    showToast(`${data.count || 0} itens importados!`, 'success');
                     setTimeout(() => location.reload(), 1000);
                 } else {
                     throw new Error(data.message || 'Erro desconhecido');
@@ -307,7 +356,7 @@
             })
             .then(data => {
                 if (data.success) {
-                    showToast('Nova lista criada ✓', 'success');
+                    showToast('Nova lista criada', 'success');
                     setTimeout(() => location.reload(), 800);
                 } else {
                     throw new Error(data.message || 'Erro desconhecido');
@@ -328,6 +377,7 @@
         const checked = document.querySelectorAll('.shopping-item.checked').length;
         const total = document.querySelectorAll('.shopping-item').length;
         document.getElementById('progress').textContent = `${checked} de ${total} itens comprados`;
+        document.getElementById('progressPercent').textContent = `${total > 0 ? Math.round(checked / total * 100) : 0}%`;
         document.getElementById('progressFill').style.width = `${total > 0 ? (checked / total * 100) : 0}%`;
     }
 </script>

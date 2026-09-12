@@ -2,7 +2,11 @@
   "permissions": {
     "allow": [
       "PowerShell(Test-NetConnection -ComputerName localhost -Port 5432 -WarningAction SilentlyContinue)",
-      "PowerShell(Get-NetTCPConnection -LocalPort 3010,3016 -State Listen -ErrorAction SilentlyContinue)"
+      "PowerShell(Get-NetTCPConnection -LocalPort 3010,3016 -State Listen -ErrorAction SilentlyContinue)",
+      "Bash(npm audit *)",
+      "Bash(npm ls *)",
+      "Bash(npm install *)",
+      "Bash(node -e \"const nm = require\\('nodemailer'\\); const t = nm.createTransport\\({host:'smtp.example.com', port:587, secure:false, auth:{user:'a',pass:'b'}}\\); console.log\\('createTransport ok, sendMail is function:', typeof t.sendMail === 'function'\\);\")"
     ]
   }
 }

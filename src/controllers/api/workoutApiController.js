@@ -8,6 +8,32 @@ function resolveImageUrl(req, publicUrl) {
   return `${req.protocol}://${req.get('host')}${publicUrl.startsWith('/') ? '' : '/'}${publicUrl}`;
 }
 
+async function loadExercisesWithImages(req, workoutGroupId) {
+  const exercisesResult = await global.db.query(
+    'SELECT id, name, sets, reps, weight, "restSeconds", notes, "order" FROM "Exercise" WHERE "workoutGroupId" = $1 ORDER BY "order" ASC',
+    [workoutGroupId]
+  );
+  const exerciseIds = exercisesResult.rows.map((exercise) => exercise.id);
+  const imagesResult = exerciseIds.length > 0
+    ? await global.db.query(
+        `SELECT "exerciseId", "publicUrl" FROM "WorkoutExerciseImage"
+         WHERE "exerciseId" = ANY($1::int[])
+         ORDER BY "sortOrder" ASC, id ASC`,
+        [exerciseIds]
+      )
+    : { rows: [] };
+  const imagesByExerciseId = imagesResult.rows.reduce((map, image) => {
+    if (!map.has(image.exerciseId)) map.set(image.exerciseId, []);
+    map.get(image.exerciseId).push(resolveImageUrl(req, image.publicUrl));
+    return map;
+  }, new Map());
+
+  return exercisesResult.rows.map((exercise) => ({
+    ...exercise,
+    images: imagesByExerciseId.get(exercise.id) || [],
+  }));
+}
+
 exports.getWorkouts = async (req, res, next) => {
   try {
     const userId = req.user.id;
@@ -23,38 +49,21 @@ exports.getWorkouts = async (req, res, next) => {
     );
 
     const plans = await Promise.all(plansResult.rows.map(async (plan) => {
-      const exercisesResult = await global.db.query(
-        'SELECT id, name, sets, reps, weight, "restSeconds", notes, "order" FROM "Exercise" WHERE "workoutPlanId" = $1 ORDER BY "order" ASC',
+      const groupsResult = await global.db.query(
+        'SELECT id, name, "order" FROM "WorkoutGroup" WHERE "workoutPlanId" = $1 ORDER BY "order" ASC',
         [plan.id]
       );
-      const exerciseIds = exercisesResult.rows.map((exercise) => exercise.id);
-      const imagesResult = exerciseIds.length > 0
-        ? await global.db.query(
-            `SELECT "exerciseId", "publicUrl" FROM "WorkoutExerciseImage"
-             WHERE "exerciseId" = ANY($1::int[])
-             ORDER BY "sortOrder" ASC, id ASC`,
-            [exerciseIds]
-          )
-        : { rows: [] };
-      const imagesByExerciseId = imagesResult.rows.reduce((map, image) => {
-        if (!map.has(image.exerciseId)) map.set(image.exerciseId, []);
-          map.get(image.exerciseId).push(resolveImageUrl(req, image.publicUrl));
-        return map;
-      }, new Map());
 
-      const userSessionsResult = await global.db.query(
-        'SELECT id FROM "WorkoutSession" WHERE "userId" = $1 AND "workoutPlanId" = $2 AND "isCompleted" = true',
-        [userId, plan.id]
-      );
+      const groups = await Promise.all(groupsResult.rows.map(async (group) => {
+        const exercises = await loadExercisesWithImages(req, group.id);
+        const groupSessionsResult = await global.db.query(
+          'SELECT id FROM "WorkoutSession" WHERE "userId" = $1 AND "workoutGroupId" = $2 AND "isCompleted" = true',
+          [userId, group.id]
+        );
+        return { ...group, exercises, sessions: groupSessionsResult.rows };
+      }));
 
-      return {
-        ...plan,
-        exercises: exercisesResult.rows.map((exercise) => ({
-          ...exercise,
-          images: imagesByExerciseId.get(exercise.id) || [],
-        })),
-        sessions: userSessionsResult.rows,
-      };
+      return { ...plan, groups };
     }));
 
     res.json({
@@ -69,23 +78,25 @@ exports.getWorkouts = async (req, res, next) => {
 
 exports.startWorkout = async (req, res, next) => {
   try {
-    const { id: planId } = req.params;
+    const { groupId } = req.params;
     const userId = req.user.id;
 
-    const planResult = await global.db.query(
-      'SELECT id, name, description FROM "WorkoutPlan" WHERE id = $1 AND "userId" = $2',
-      [parseInt(planId, 10), userId]
+    const groupResult = await global.db.query(
+      `SELECT wg.id, wg.name, wg."workoutPlanId" FROM "WorkoutGroup" wg
+       JOIN "WorkoutPlan" wp ON wg."workoutPlanId" = wp.id
+       WHERE wg.id = $1 AND wp."userId" = $2`,
+      [parseInt(groupId, 10), userId]
     );
 
-    if (planResult.rows.length === 0) {
-      return res.status(404).json({ success: false, message: 'Plano não encontrado' });
+    if (groupResult.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Treino não encontrado' });
     }
 
-    const plan = planResult.rows[0];
+    const group = groupResult.rows[0];
 
     const existingSession = await global.db.query(
-      `SELECT id FROM "WorkoutSession" WHERE "userId" = $1 AND "workoutPlanId" = $2 AND "isCompleted" = false ORDER BY "startedAt" DESC LIMIT 1`,
-      [userId, plan.id]
+      `SELECT id FROM "WorkoutSession" WHERE "userId" = $1 AND "workoutGroupId" = $2 AND "isCompleted" = false ORDER BY "startedAt" DESC LIMIT 1`,
+      [userId, group.id]
     );
 
     if (existingSession.rows.length > 0) {
@@ -93,15 +104,15 @@ exports.startWorkout = async (req, res, next) => {
     }
 
     const sessionResult = await global.db.query(
-      `INSERT INTO "WorkoutSession" ("userId", "workoutPlanId", "startedAt", "isCompleted")
-       VALUES ($1, $2, NOW(), false) RETURNING id`,
-      [userId, plan.id]
+      `INSERT INTO "WorkoutSession" ("userId", "workoutPlanId", "workoutGroupId", "startedAt", "isCompleted")
+       VALUES ($1, $2, $3, NOW(), false) RETURNING id`,
+      [userId, group.workoutPlanId, group.id]
     );
     const sessionId = sessionResult.rows[0].id;
 
     const exercisesResult = await global.db.query(
-      'SELECT id FROM "Exercise" WHERE "workoutPlanId" = $1 ORDER BY "order" ASC',
-      [plan.id]
+      'SELECT id FROM "Exercise" WHERE "workoutGroupId" = $1 ORDER BY "order" ASC',
+      [group.id]
     );
 
     for (const exercise of exercisesResult.rows) {
@@ -124,9 +135,10 @@ exports.getHistory = async (req, res, next) => {
 
     const sessionsResult = await global.db.query(
       `SELECT ws.id, ws."workoutPlanId", ws."startedAt", ws."completedAt", ws."durationMin", ws."notes",
-              wp.name as plan_name
+              wp.name as plan_name, wg.name as group_name
        FROM "WorkoutSession" ws
        JOIN "WorkoutPlan" wp ON ws."workoutPlanId" = wp.id
+       LEFT JOIN "WorkoutGroup" wg ON ws."workoutGroupId" = wg.id
        WHERE ws."userId" = $1 AND ws."isCompleted" = true
        ORDER BY ws."completedAt" DESC`,
       [userId]
@@ -140,6 +152,7 @@ exports.getHistory = async (req, res, next) => {
       durationMin: row.durationMin,
       notes: row.notes,
       planName: row.plan_name,
+      groupName: row.group_name,
     }));
 
     res.json({ success: true, sessions, totalSessions: sessions.length });
@@ -152,8 +165,9 @@ exports.getActiveWorkout = async (req, res, next) => {
   try {
     const sessionId = parseInt(req.params.sessionId, 10);
     const sessionResult = await global.db.query(
-      `SELECT ws.id, ws."startedAt", wp.name AS "planName" FROM "WorkoutSession" ws
+      `SELECT ws.id, ws."startedAt", wp.name AS "planName", wg.name AS "groupName" FROM "WorkoutSession" ws
        JOIN "WorkoutPlan" wp ON wp.id = ws."workoutPlanId"
+       LEFT JOIN "WorkoutGroup" wg ON wg.id = ws."workoutGroupId"
        WHERE ws.id = $1 AND ws."userId" = $2 AND ws."isCompleted" = false`,
       [sessionId, req.user.id]
     );
@@ -231,8 +245,74 @@ exports.deleteWorkoutPlan = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Plano não encontrado' });
     }
     await global.db.query(`DELETE FROM "WorkoutSession" WHERE "workoutPlanId" = $1`, [planId]);
-    await global.db.query(`DELETE FROM "Exercise" WHERE "workoutPlanId" = $1`, [planId]);
+    await global.db.query(`DELETE FROM "WorkoutGroup" WHERE "workoutPlanId" = $1`, [planId]);
     await global.db.query(`DELETE FROM "WorkoutPlan" WHERE id = $1`, [planId]);
+    res.json({ success: true });
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.createWorkoutGroup = async (req, res, next) => {
+  try {
+    const { planId } = req.params;
+    const { name } = req.body;
+    if (!name || !name.trim()) {
+      return res.status(400).json({ success: false, message: 'Nome do grupo muscular é obrigatório' });
+    }
+    const planCheck = await global.db.query('SELECT id FROM "WorkoutPlan" WHERE id = $1 AND "userId" = $2', [parseInt(planId, 10), req.user.id]);
+    if (planCheck.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Plano não encontrado' });
+    }
+    const orderResult = await global.db.query(
+      'SELECT COALESCE(MAX("order"), -1) + 1 AS next FROM "WorkoutGroup" WHERE "workoutPlanId" = $1',
+      [parseInt(planId, 10)]
+    );
+    const result = await global.db.query(
+      `INSERT INTO "WorkoutGroup" ("workoutPlanId", name, "order") VALUES ($1, $2, $3) RETURNING *`,
+      [parseInt(planId, 10), name.trim(), orderResult.rows[0].next]
+    );
+    res.status(201).json({ success: true, group: { ...result.rows[0], exercises: [], sessions: [] } });
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.updateWorkoutGroup = async (req, res, next) => {
+  try {
+    const { groupId } = req.params;
+    const { name } = req.body;
+    if (!name || !name.trim()) {
+      return res.status(400).json({ success: false, message: 'Nome do grupo muscular é obrigatório' });
+    }
+    const result = await global.db.query(
+      `UPDATE "WorkoutGroup" wg SET name = $1
+       FROM "WorkoutPlan" wp
+       WHERE wg.id = $2 AND wg."workoutPlanId" = wp.id AND wp."userId" = $3
+       RETURNING wg.*`,
+      [name.trim(), parseInt(groupId, 10), req.user.id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Grupo muscular não encontrado' });
+    }
+    res.json({ success: true, group: result.rows[0] });
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.deleteWorkoutGroup = async (req, res, next) => {
+  try {
+    const { groupId } = req.params;
+    const check = await global.db.query(
+      `SELECT wg.id FROM "WorkoutGroup" wg JOIN "WorkoutPlan" wp ON wg."workoutPlanId" = wp.id
+       WHERE wg.id = $1 AND wp."userId" = $2`,
+      [parseInt(groupId, 10), req.user.id]
+    );
+    if (check.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Grupo muscular não encontrado' });
+    }
+    await global.db.query('DELETE FROM "WorkoutGroup" WHERE id = $1', [parseInt(groupId, 10)]);
     res.json({ success: true });
   } catch (error) {
     next(error);
@@ -277,16 +357,19 @@ exports.updateWorkoutPlan = async (req, res, next) => {
   }
 };
 
-exports.getExercisesForPlan = async (req, res, next) => {
+exports.getExercisesForGroup = async (req, res, next) => {
   try {
-    const { planId } = req.params;
-    const planCheck = await global.db.query('SELECT id FROM "WorkoutPlan" WHERE id = $1 AND "userId" = $2', [parseInt(planId, 10), req.user.id]);
-    if (planCheck.rows.length === 0) {
-      return res.status(404).json({ success: false, message: 'Plano não encontrado' });
+    const { groupId } = req.params;
+    const groupCheck = await global.db.query(
+      `SELECT wg.id FROM "WorkoutGroup" wg JOIN "WorkoutPlan" wp ON wg."workoutPlanId" = wp.id WHERE wg.id = $1 AND wp."userId" = $2`,
+      [parseInt(groupId, 10), req.user.id]
+    );
+    if (groupCheck.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Grupo muscular não encontrado' });
     }
     const result = await global.db.query(
-      `SELECT id, name, sets, reps, weight, "restSeconds", notes, "order" FROM "Exercise" WHERE "workoutPlanId" = $1 ORDER BY "order" ASC`,
-      [parseInt(planId, 10)]
+      `SELECT id, name, sets, reps, weight, "restSeconds", notes, "order" FROM "Exercise" WHERE "workoutGroupId" = $1 ORDER BY "order" ASC`,
+      [parseInt(groupId, 10)]
     );
     res.json({ success: true, exercises: result.rows });
   } catch (error) {
@@ -296,19 +379,23 @@ exports.getExercisesForPlan = async (req, res, next) => {
 
 exports.addExercise = async (req, res, next) => {
   try {
-    const { planId } = req.params;
+    const { groupId } = req.params;
     const { name, sets, reps, weight, restSeconds, notes } = req.body;
     if (!name || !sets || !reps) {
       return res.status(400).json({ success: false, message: 'Nome, séries e repetições são obrigatórios' });
     }
-    const planCheck = await global.db.query('SELECT id FROM "WorkoutPlan" WHERE id = $1 AND "userId" = $2', [parseInt(planId, 10), req.user.id]);
-    if (planCheck.rows.length === 0) {
-      return res.status(404).json({ success: false, message: 'Plano não encontrado' });
+    const groupCheck = await global.db.query(
+      `SELECT wg.id, wg."workoutPlanId" FROM "WorkoutGroup" wg JOIN "WorkoutPlan" wp ON wg."workoutPlanId" = wp.id WHERE wg.id = $1 AND wp."userId" = $2`,
+      [parseInt(groupId, 10), req.user.id]
+    );
+    if (groupCheck.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Grupo muscular não encontrado' });
     }
+    const group = groupCheck.rows[0];
     const result = await global.db.query(
-      `INSERT INTO "Exercise" ("workoutPlanId", name, sets, reps, weight, "restSeconds", notes)
-       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-      [parseInt(planId, 10), name, parseInt(sets, 10), reps, weight || null, restSeconds ? parseInt(restSeconds, 10) : null, notes || null]
+      `INSERT INTO "Exercise" ("workoutPlanId", "workoutGroupId", name, sets, reps, weight, "restSeconds", notes)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+      [group.workoutPlanId, group.id, name, parseInt(sets, 10), reps, weight || null, restSeconds ? parseInt(restSeconds, 10) : null, notes || null]
     );
     res.status(201).json({ success: true, exercise: result.rows[0] });
   } catch (error) {
@@ -324,7 +411,10 @@ exports.updateExercise = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'Nome, séries e repetições são obrigatórios' });
     }
     const ownerCheck = await global.db.query(
-      `SELECT e.id FROM "Exercise" e JOIN "WorkoutPlan" wp ON e."workoutPlanId" = wp.id WHERE e.id = $1 AND wp."userId" = $2`,
+      `SELECT e.id FROM "Exercise" e
+       JOIN "WorkoutGroup" wg ON e."workoutGroupId" = wg.id
+       JOIN "WorkoutPlan" wp ON wg."workoutPlanId" = wp.id
+       WHERE e.id = $1 AND wp."userId" = $2`,
       [parseInt(exerciseId, 10), req.user.id]
     );
     if (ownerCheck.rows.length === 0) {

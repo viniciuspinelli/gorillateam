@@ -1,0 +1,142 @@
+<div class="plan-card" id="plan-card-<%= plan.id %>">
+    <div class="plan-row" id="plan-row-<%= plan.id %>">
+        <div class="plan-row-info">
+            <span class="plan-row-name"><%= plan.name %></span>
+            <div class="plan-row-meta">
+                <% if (plan.dayOfWeek) { %><span class="day-badge"><%= plan.dayOfWeek %></span><% } %>
+                <span class="badge-count"><%= plan.groups.length %> grupo<%= plan.groups.length !== 1 ? 's' : '' %> · <%= plan.exercise_count %> exerc.</span>
+                <% if (!plan.isActive) { %><span class="badge badge-warning">Inativo</span><% } %>
+            </div>
+        </div>
+        <div class="plan-row-actions">
+            <% if (typeof isAdmin !== 'undefined' && isAdmin) { %>
+            <button class="btn btn-sm <%= plan.isTemplate ? 'btn-primary' : 'btn-secondary' %>"
+                    onclick="toggleTemplate(<%= plan.id %>, this)"
+                    title="<%= plan.isTemplate ? 'Remover da Biblioteca' : 'Mover para Biblioteca' %>">
+                <%= plan.isTemplate ? 'Biblioteca' : 'Tornar Template' %>
+            </button>
+            <% } %>
+            <button class="btn btn-secondary btn-sm" id="btn-edit-<%= plan.id %>" onclick="toggleGroupsPanel(<%= plan.id %>)">
+                Editar
+            </button>
+            <button class="btn btn-danger btn-sm" onclick="deletePlan(<%= plan.id %>, '<%= plan.name.replace(/\'/g, `\\'`) %>')">
+                Deletar
+            </button>
+        </div>
+    </div>
+
+    <!-- Muscle-group sessions panel (inline, oculto por padrao) -->
+    <div class="plan-exercises-panel" id="groups-panel-<%= plan.id %>">
+        <div class="exercises-panel-header">
+            <span class="exercises-section-label">GRUPOS MUSCULARES</span>
+            <button class="btn-icon" onclick="toggleGroupsPanel(<%= plan.id %>)" title="Fechar painel">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+        </div>
+
+        <div class="muscle-groups-list" id="groups-list-<%= plan.id %>">
+            <% plan.groups.forEach(group => { %>
+                <div class="muscle-group-card" id="group-card-<%= group.id %>">
+                    <div class="muscle-group-row">
+                        <span class="muscle-group-name" id="group-name-<%= group.id %>"><%= group.name %></span>
+                        <span class="badge-count" id="group-excnt-<%= group.id %>"><%= group.exercise_count %> exerc.</span>
+                        <div class="muscle-group-actions">
+                            <button class="btn-icon" onclick="renameGroup(<%= group.id %>)" title="Renomear grupo">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                            </button>
+                            <button class="btn btn-secondary btn-sm" id="btn-toggle-group-<%= group.id %>" onclick="toggleGroupExercises(<%= group.id %>)">
+                                Exercícios
+                            </button>
+                            <button class="btn-icon btn-icon-danger" onclick="deleteGroup(<%= group.id %>, <%= plan.id %>, '<%= group.name.replace(/\'/g, `\\'`) %>')" title="Remover grupo">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Exercises panel for this muscle group (inline, oculto por padrao) -->
+                    <div class="group-exercises-panel" id="group-ex-panel-<%= group.id %>">
+                        <div id="ex-list-<%= group.id %>"></div>
+
+                        <!-- Adicionar exercicio inline -->
+                        <div class="add-exercise-details" id="add-details-<%= group.id %>">
+                            <button class="add-exercise-summary" type="button" onclick="toggleAddEx(<%= group.id %>)">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                                Adicionar Exercicio
+                            </button>
+                            <div class="add-exercise-body" id="add-form-<%= group.id %>" style="display:none">
+                                <form onsubmit="submitAddEx(event, <%= group.id %>)">
+                                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                                    <div class="form-grid-3">
+                                        <div class="form-group">
+                                            <label>Nome *</label>
+                                            <input type="text" name="name" placeholder="ex: Supino" required>
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Series *</label>
+                                            <input type="number" name="sets" placeholder="4" min="1" max="20" required>
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Reps *</label>
+                                            <input type="text" name="reps" placeholder="8-12" required>
+                                        </div>
+                                    </div>
+                                    <div class="form-grid-3">
+                                        <div class="form-group">
+                                            <label>Carga</label>
+                                            <input type="text" name="weight" placeholder="60kg">
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Descanso (seg)</label>
+                                            <input type="number" name="restSeconds" placeholder="60" min="0">
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Notas</label>
+                                            <input type="text" name="notes" placeholder="Dicas...">
+                                        </div>
+                                    </div>
+                                    <div class="form-grid-3">
+                                        <div class="form-group">
+                                            <label>Foto pela camera</label>
+                                            <input type="file" name="cameraImage" accept="image/*" capture="environment">
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Imagem da galeria</label>
+                                            <input type="file" name="galleryImage" accept="image/*">
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Dica</label>
+                                            <input type="text" value="Opcional: tire ou anexe uma imagem agora" readonly>
+                                        </div>
+                                    </div>
+                                    <div class="inline-edit-actions">
+                                        <button type="submit" class="btn btn-primary btn-sm">Adicionar</button>
+                                        <button type="button" class="btn btn-secondary btn-sm" onclick="toggleAddEx(<%= group.id %>)">Cancelar</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            <% }); %>
+        </div>
+
+        <!-- Adicionar grupo muscular inline -->
+        <button class="add-exercise-summary" type="button" onclick="toggleAddGroupForm(<%= plan.id %>)">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Adicionar Grupo Muscular
+        </button>
+        <div class="add-exercise-body" id="add-group-form-<%= plan.id %>" style="display:none">
+            <form onsubmit="submitAddGroup(event, <%= plan.id %>)">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                <div class="form-group">
+                    <label>Nome do Grupo Muscular *</label>
+                    <input type="text" name="name" placeholder="ex: Peito e Tríceps" required>
+                </div>
+                <div class="inline-edit-actions">
+                    <button type="submit" class="btn btn-primary btn-sm">Criar Grupo</button>
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="toggleAddGroupForm(<%= plan.id %>)">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

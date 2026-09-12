@@ -7,6 +7,7 @@ router.get('/', adminController.getDashboard);
 
 // User management
 router.get('/users', adminController.getUsers);
+router.post('/users/invite-link/regenerate', adminController.regenerateInviteLink);
 router.get('/users/new', adminController.getCreateUser);
 router.post('/users/new', adminController.postCreateUser);
 router.get('/users/:id/edit', adminController.getEditUser);

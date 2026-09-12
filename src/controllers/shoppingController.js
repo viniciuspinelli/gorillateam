@@ -1,5 +1,29 @@
 // Shopping Controller - Using global.db (pg Pool)
 
+// Keyword-based category guesser for items imported from the diet, so they land
+// in the same categories used by the manual "Adicionar Item" dropdown instead of
+// all dumping into "Outros".
+const CATEGORY_KEYWORDS = {
+  'Proteínas': ['frango', 'carne', 'peixe', 'tilapia', 'salmao', 'atum', 'sardinha', 'camarao', 'ovo', 'peru', 'presunto', 'patinho', 'alcatra', 'contra file', 'picanha', 'coxao', 'lombo', 'tofu', 'soja', 'feijao', 'lentilha', 'grao de bico', 'ervilha', 'whey', 'caseina', 'albumina', 'cottage', 'ricota'],
+  'Carboidratos': ['arroz', 'batata', 'mandioca', 'inhame', 'cara', 'macarrao', 'massa', 'pao', 'tapioca', 'cuscuz', 'aveia', 'granola', 'quinoa', 'milho'],
+  'Vegetais': ['alface', 'rucula', 'couve', 'repolho', 'tomate', 'pepino', 'abobrinha', 'berinjela', 'chuchu', 'cenoura', 'beterraba', 'brocolis', 'couve-flor', 'espinafre', 'vagem', 'pimentao', 'salada'],
+  'Frutas': ['banana', 'maca', 'laranja', 'mamao', 'melancia', 'melao', 'abacaxi', 'uva', 'morango', 'manga', 'abacate', 'kiwi', 'pera'],
+  'Laticínios': ['leite', 'iogurte', 'queijo', 'requeijao'],
+  'Gorduras': ['azeite', 'oleo', 'castanha', 'amendoa', 'noz', 'amendoim', 'coco ralado', 'chia', 'linhaca'],
+};
+
+function normalizeText(s) {
+  return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+}
+
+function guessCategory(name) {
+  const normalized = normalizeText(name);
+  for (const [category, keywords] of Object.entries(CATEGORY_KEYWORDS)) {
+    if (keywords.some(k => normalized.includes(k))) return category;
+  }
+  return 'Outros';
+}
+
 /**
  * Get shopping list page
  */
@@ -252,6 +276,35 @@ exports.deleteItem = async (req, res, next) => {
 };
 
 /**
+ * Mark every item in the list as checked (so "Limpar Marcados" can clear it all at once)
+ */
+exports.checkAllItems = async (req, res, next) => {
+  try {
+    const { listId } = req.params;
+    const userId = req.session.user.id;
+
+    // Verify list belongs to user
+    const listCheck = await global.db.query(
+      'SELECT id FROM "ShoppingList" WHERE id = $1 AND "userId" = $2',
+      [parseInt(listId), userId]
+    );
+    if (listCheck.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Lista não encontrada' });
+    }
+
+    await global.db.query(
+      `UPDATE "ShoppingItem" SET "isChecked" = true WHERE "shoppingListId" = $1`,
+      [parseInt(listId)]
+    );
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error checking all items:', error);
+    next(error);
+  }
+};
+
+/**
  * Clear all checked items
  */
 exports.clearChecked = async (req, res, next) => {
@@ -372,7 +425,7 @@ exports.importFromDiet = async (req, res, next) => {
         `INSERT INTO "ShoppingItem" ("shoppingListId", name, quantity, category, "isChecked")
          VALUES ($1, $2, $3, $4, false)
          RETURNING *`,
-        [listId, food.name, food.quantity, 'Outros']
+        [listId, food.name, food.quantity, guessCategory(food.name)]
       );
       importedItems.push(result.rows[0]);
     }

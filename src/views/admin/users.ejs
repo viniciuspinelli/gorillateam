@@ -1,37 +1,75 @@
 <div class="admin-page">
-    <div class="page-header">
-        <div>
-            <h1><% if (isAdmin) { %>👥 Gerenciar Alunos<% } else { %>👥 Meus Alunos<% } %></h1>
+    <div class="page-header" style="display:flex; align-items:center; gap:14px; border-bottom:1px solid var(--border-subtle);">
+        <span style="width:40px; height:40px; border-radius:var(--radius-md); background:var(--accent-muted); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent-primary)" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        </span>
+        <div style="flex:1;">
+            <h1 style="margin-bottom:2px;"><% if (isAdmin) { %>Gerenciar Alunos<% } else { %>Meus Alunos<% } %></h1>
             <p class="page-subtitle"><%= users.length %> aluno(s) cadastrado(s)</p>
         </div>
-        <a href="/admin/users/new" class="btn btn-primary">➕ Novo Aluno</a>
+        <a href="/admin/users/new" class="btn btn-primary">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Novo Aluno
+        </a>
+    </div>
+
+    <div class="invite-link-card">
+        <div class="invite-link-header">
+            <span class="section-icon-badge">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+            </span>
+            <div>
+                <div class="invite-link-title">Link de Convite</div>
+                <div class="invite-link-desc">Envie para um aluno se cadastrar já vinculado a você — só admins e instrutores podem criar contas.</div>
+            </div>
+        </div>
+        <div class="invite-link-row">
+            <input type="text" id="inviteLinkInput" class="invite-link-input" value="<%= inviteLink %>" readonly onclick="this.select()">
+            <button class="btn btn-sm btn-secondary" id="btn-copy-invite" onclick="copyInviteLink()">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                Copiar
+            </button>
+        </div>
+        <button type="button" class="btn-text-link" id="btn-regen-invite" onclick="regenerateInviteLink()">Gerar novo link (invalida o link anterior)</button>
     </div>
 
     <div class="admin-users-list">
         <% users.forEach(u => { %>
             <div class="admin-user-row">
+                <span class="admin-user-avatar"><%= u.username.charAt(0).toUpperCase() %></span>
                 <div class="admin-user-info">
-                    <span class="admin-user-avatar"><%= u.username.charAt(0).toUpperCase() %></span>
-                    <div>
-                        <span class="admin-user-name">
-                            <%= u.fullName || u.username %>
-                            <% if (u.fullName) { %><small style="font-weight:400;color:var(--text-secondary, #888);margin-left:6px;">@<%= u.username %></small><% } %>
-                        </span>
-                        <span class="admin-user-role <%= u.role === 'admin' ? 'role-admin' : (u.role === 'instructor' ? 'role-instructor' : 'role-user') %>">
-                            <%= u.role === 'admin' ? '⚡ Admin' : (u.role === 'instructor' ? '🎓 Instrutor' : '👤 Aluno') %>
+                    <span class="admin-user-name">
+                        <%= u.fullName || u.username %>
+                        <% if (u.fullName) { %><small style="font-weight:400;color:var(--text-secondary);margin-left:6px;">@<%= u.username %></small><% } %>
+                    </span>
+                    <div style="display:flex; align-items:center; flex-wrap:wrap; gap:6px; margin-top:6px;">
+                        <span class="role-badge <%= u.role === 'admin' ? 'role-badge-admin' : '' %>">
+                            <% if (u.role === 'admin') { %>
+                                <svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>Admin
+                            <% } else if (u.role === 'instructor') { %>
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg>Instrutor
+                            <% } else { %>
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Aluno
+                            <% } %>
                         </span>
                         <% if (isAdmin && u.instructorUsername) { %>
-                            <span class="admin-user-role" style="background:var(--surface-elevated,#222);color:var(--text-secondary,#aaa);font-size:0.72rem;margin-left:4px;">📋 <%= u.instructorFullName || u.instructorUsername %></span>
+                            <span class="role-badge">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41 13.42 20.6a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82Z"/><circle cx="7" cy="7" r="1.5"/></svg>
+                                <%= u.instructorFullName || u.instructorUsername %>
+                            </span>
                         <% } %>
                     </div>
                 </div>
                 <div class="admin-user-actions">
-                    <% if (u.role === 'user') { %>
                     <a href="/admin/users/<%= u.id %>" class="btn btn-sm btn-secondary">Ver Planos</a>
-                    <% } %>
-                    <a href="/admin/users/<%= u.id %>/edit" class="btn btn-sm btn-secondary">✏️ Editar</a>
+                    <a href="/admin/users/<%= u.id %>/edit" class="btn btn-sm btn-secondary">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+                        Editar
+                    </a>
                     <% if (u.id !== user.id) { %>
-                        <button class="btn btn-sm btn-danger js-delete-user" data-id="<%= u.id %>" data-username="<%= u.username %>">🗑️</button>
+                        <button class="btn btn-sm btn-danger js-delete-user" data-id="<%= u.id %>" data-username="<%= u.username %>" title="Excluir" aria-label="Excluir usuário">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+                        </button>
                     <% } %>
                 </div>
             </div>
@@ -39,6 +77,7 @@
 
         <% if (users.length === 0) { %>
             <div class="empty-state">
+                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="display:block; margin:0 auto 14px; opacity:0.5;"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
                 <p>Nenhum aluno cadastrado ainda.</p>
                 <a href="/admin/users/new" class="btn btn-primary">Criar primeiro aluno</a>
             </div>
@@ -47,6 +86,36 @@
 </div>
 
 <script nonce="<%= nonce %>">
+function copyInviteLink() {
+    const input = document.getElementById('inviteLinkInput');
+    input.select();
+    navigator.clipboard.writeText(input.value).then(function() {
+        showToast('Link copiado!', 'success');
+    }).catch(function() {
+        document.execCommand('copy');
+        showToast('Link copiado!', 'success');
+    });
+}
+
+async function regenerateInviteLink() {
+    if (!confirm('Gerar um novo link? O link atual deixará de funcionar.')) return;
+    try {
+        const res = await fetch('/admin/users/invite-link/regenerate', {
+            method: 'POST',
+            headers: { 'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').content }
+        });
+        const data = await res.json();
+        if (data.success) {
+            document.getElementById('inviteLinkInput').value = data.inviteLink;
+            showToast('Novo link gerado!', 'success');
+        } else {
+            showToast(data.message || 'Erro ao gerar link', 'error');
+        }
+    } catch (_) {
+        showToast('Erro de conexão', 'error');
+    }
+}
+
 document.querySelectorAll('.js-delete-user').forEach(function(btn) {
     btn.addEventListener('click', function() {
         const id = this.dataset.id;

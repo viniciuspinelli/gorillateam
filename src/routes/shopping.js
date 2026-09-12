@@ -21,6 +21,9 @@ router.patch('/items/:itemId', shoppingController.updateItem);
 // DELETE /shopping/items/:itemId - delete item
 router.delete('/items/:itemId', shoppingController.deleteItem);
 
+// PATCH /shopping/lists/:listId/check-all - mark every item in the list as checked
+router.patch('/lists/:listId/check-all', shoppingController.checkAllItems);
+
 // DELETE /shopping/lists/:listId/checked - clear checked items
 router.delete('/lists/:listId/checked', shoppingController.clearChecked);
 

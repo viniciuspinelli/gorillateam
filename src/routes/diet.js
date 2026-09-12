@@ -25,8 +25,17 @@ router.delete('/meals/:mealId', dietController.deleteMeal);
 // POST /diet/meals/:mealId/foods - add food to meal
 router.post('/meals/:mealId/foods', dietController.addFood);
 
+// PUT /diet/foods/:foodId - update a food
+router.put('/foods/:foodId', dietController.updateFood);
+
 // DELETE /diet/foods/:foodId - delete a food
 router.delete('/foods/:foodId', dietController.deleteFood);
+
+// POST /diet/foods/:foodId/options - add a substitute option to a food
+router.post('/foods/:foodId/options', dietController.addFoodOption);
+
+// DELETE /diet/food-options/:optionId - remove a substitute option
+router.delete('/food-options/:optionId', dietController.deleteFoodOption);
 
 // PATCH /diet/plans/:planId/toggle-template - toggle template flag (admin)
 router.patch('/plans/:planId/toggle-template', dietController.toggleTemplate);

@@ -1,18 +1,25 @@
 <div class="admin-page">
-    <div class="page-header">
-        <h1>👤 Meu Perfil</h1>
-        <p class="page-subtitle">Gerencie seus dados de acesso</p>
+    <div class="page-header" style="display:flex; align-items:center; gap:14px; border-bottom:1px solid var(--border-subtle);">
+        <span style="width:40px; height:40px; border-radius:var(--radius-md); background:var(--accent-muted); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent-primary)" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        </span>
+        <div>
+            <h1 style="margin-bottom:2px;">Meu Perfil</h1>
+            <p class="page-subtitle">Gerencie seus dados de acesso</p>
+        </div>
     </div>
 
     <% if (success) { %>
-        <div class="alert-success" style="margin-bottom:16px;padding:12px 16px;border-radius:8px;background:rgba(34,197,94,0.12);border:1px solid rgba(34,197,94,0.3);color:#22c55e;font-size:14px;">
-            ✅ <%= success %>
+        <div class="alert alert-success" style="margin-bottom:16px;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            <%= success %>
         </div>
     <% } %>
 
     <% if (error) { %>
-        <div class="alert-error" style="margin-bottom:16px;padding:12px 16px;border-radius:8px;background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.3);color:#ef4444;font-size:14px;">
-            ⚠️ <%= error %>
+        <div class="alert alert-error" style="margin-bottom:16px;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            <%= error %>
         </div>
     <% } %>
 
@@ -21,13 +28,13 @@
 
         <!-- Dados Pessoais -->
         <div class="admin-section-header" style="margin-bottom:16px;">
-            <h2 style="font-size:14px;font-weight:600;text-transform:uppercase;color:var(--text-muted);letter-spacing:.05em;">Dados Pessoais</h2>
+            <h2 style="font-size:14px;font-weight:600;text-transform:uppercase;color:var(--text-tertiary);letter-spacing:.05em;">Dados Pessoais</h2>
         </div>
 
         <div class="form-group">
             <label class="form-label">Usuário</label>
             <input type="text" class="form-input" value="<%= profile.username %>" disabled style="opacity:.5;cursor:not-allowed;">
-            <span style="font-size:11px;color:var(--text-muted);margin-top:4px;display:block;">O nome de usuário não pode ser alterado.</span>
+            <span style="font-size:11px;color:var(--text-tertiary);margin-top:4px;display:block;">O nome de usuário não pode ser alterado.</span>
         </div>
 
         <div class="form-group">
@@ -44,7 +51,7 @@
 
         <!-- Alterar Senha -->
         <div class="admin-section-header" style="margin:24px 0 16px;">
-            <h2 style="font-size:14px;font-weight:600;text-transform:uppercase;color:var(--text-muted);letter-spacing:.05em;">Alterar Senha <span style="font-weight:400;font-size:12px;">(opcional)</span></h2>
+            <h2 style="font-size:14px;font-weight:600;text-transform:uppercase;color:var(--text-tertiary);letter-spacing:.05em;">Alterar Senha <span style="font-weight:400;font-size:12px;">(opcional)</span></h2>
         </div>
 
         <div class="form-group">

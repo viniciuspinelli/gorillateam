@@ -1,8 +1,8 @@
 <div class="active-workout-page">
     <!-- Workout Header -->
     <div class="workout-header">
-        <h1><%= session.workoutPlan.name %></h1>
-        <a href="/workouts" class="btn-back">← Voltar</a>
+        <h1><%= session.workoutPlan.groupName ? session.workoutPlan.name + ' · ' + session.workoutPlan.groupName : session.workoutPlan.name %></h1>
+        <a href="/workouts" class="btn-back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>Voltar</a>
     </div>
 
     <!-- Progress -->
@@ -10,6 +10,7 @@
         <div class="progress-bar-container">
             <div class="progress-label">
                 <span id="progressText"><%= completedCount %>/<%= totalCount %> exercícios</span>
+                <span class="progress-percent" id="progressPercent"><%= totalCount > 0 ? Math.round(completedCount / totalCount * 100) : 0 %>%</span>
             </div>
             <div class="progress-bar">
                 <div id="progressFill" class="progress-fill" style="width: <%= totalCount > 0 ? (completedCount / totalCount * 100) : 0 %>%"></div>
@@ -39,8 +40,9 @@
                                 </span>
                             <% } %>
                             <% if (sessionExercise.exercise.restSeconds) { %>
-                                <span class="meta-item">
-                                    🕐 <%= sessionExercise.exercise.restSeconds %>s descanso
+                                <span class="meta-item" style="display:inline-flex; align-items:center; gap:4px;">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                                    <%= sessionExercise.exercise.restSeconds %>s descanso
                                 </span>
                             <% } %>
                         </div>
@@ -52,14 +54,16 @@
                                 <button
                                     type="button"
                                     class="btn btn-secondary btn-sm btn-open-images"
-                                    data-images="<%- JSON.stringify(sessionExercise.exercise.images).replace(/"/g, '&quot;') %>">
-                                    📷 Ver foto<%= sessionExercise.exercise.images.length > 1 ? 's' : '' %>
+                                    data-images="<%- JSON.stringify(sessionExercise.exercise.images).replace(/"/g, '&quot;') %>"
+                                    style="display:inline-flex; align-items:center; gap:6px;">
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                                    Ver foto<%= sessionExercise.exercise.images.length > 1 ? 's' : '' %>
                                 </button>
                             </div>
                         <% } %>
                     </div>
                     <button class="btn-complete" data-session-id="<%= session.id %>" data-exercise-id="<%= sessionExercise.id %>">
-                        <span class="check-icon">✓</span>
+                        <span class="check-icon"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></span>
                         <span class="check-text">Concluído</span>
                     </button>
                 </div>
@@ -70,7 +74,8 @@
     <!-- Complete Workout Button -->
     <div class="complete-section" style="display: none;" id="completeSection">
         <button id="completeWorkoutBtn" class="btn btn-success btn-lg">
-            🏁 Finalizar Treino
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            Finalizar Treino
         </button>
     </div>
 
@@ -131,14 +136,15 @@
                     exerciseItem.classList.add('completed');
                     completedCount++;
                     document.getElementById('progressText').textContent = `${completedCount}/${totalExercises} exercícios`;
+                    document.getElementById('progressPercent').textContent = `${Math.round((completedCount / totalExercises) * 100)}%`;
                     document.getElementById('progressFill').style.width = `${(completedCount / totalExercises) * 100}%`;
 
                     // Auto-finish when all exercises done
                     if (completedCount === totalExercises) {
-                        showToast('Todos os exercícios concluídos! Finalizando treino... 🎉', 'success');
+                        showToast('Todos os exercícios concluídos! Finalizando treino...', 'success');
                         await finishWorkout();
                     } else {
-                        showToast('Exercício concluído! ✓', 'success');
+                        showToast('Exercício concluído!', 'success');
                     }
                 } else {
                     throw new Error(data.message || 'Erro desconhecido');

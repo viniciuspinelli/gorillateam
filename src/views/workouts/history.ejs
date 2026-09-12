@@ -1,7 +1,12 @@
 <div class="history-page">
-    <div class="history-header">
-        <h1>📊 Histórico de Treinos</h1>
-        <p class="history-subtitle">Total: <strong><%= totalSessions %></strong> treino(s)</p>
+    <div class="history-header" style="display:flex; align-items:center; gap:14px;">
+        <span style="width:40px; height:40px; border-radius:var(--radius-md); background:var(--accent-muted); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent-primary)" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        </span>
+        <div>
+            <h1 style="margin-bottom:2px;">Histórico de Treinos</h1>
+            <p class="history-subtitle">Total: <strong><%= totalSessions %></strong> treino(s)</p>
+        </div>
     </div>
 
     <% if (sessions.length > 0) { %>
@@ -14,21 +19,21 @@
                     <% planSessions.forEach(session => { %>
                         <div class="session-card">
                             <div class="card-header">
-                                <h3><%= new Date(session.completedAt).toLocaleDateString('pt-BR') %></h3>
+                                <h3><%= new Date(session.completedAt).toLocaleDateString('pt-BR') %><% if (session.groupName) { %> <span style="font-weight:400; color:var(--text-tertiary); font-size:13px;">· <%= session.groupName %></span><% } %></h3>
                             </div>
                             
                             <div class="card-body">
                                 <div class="session-stats">
                                     <div class="stat">
-                                        <span class="label">⏱️ Duração:</span>
+                                        <span class="label"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px; margin-right:3px;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Duração:</span>
                                         <span class="value"><%= session.durationMin ? session.durationMin + ' min' : 'N/A' %></span>
                                     </div>
                                     <div class="stat">
-                                        <span class="label">✅ Exercícios:</span>
+                                        <span class="label"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px; margin-right:3px;"><polyline points="20 6 9 17 4 12"/></svg>Exercícios:</span>
                                         <span class="value"><%= session.sessionExercises.filter(se => se.isCompleted).length %>/<%= session.sessionExercises.length %></span>
                                     </div>
                                     <div class="stat">
-                                        <span class="label">🕐 Hora:</span>
+                                        <span class="label"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px; margin-right:3px;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Hora:</span>
                                         <span class="value"><%= new Date(session.completedAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) %></span>
                                     </div>
                                 </div>

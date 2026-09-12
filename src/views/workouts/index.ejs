@@ -1,75 +1,108 @@
 <div class="workouts-page">
-    <!-- Header Stats -->
-    <div class="stats-card">
-        <div class="stat-item">
-            <h3>🏆 Total de Treinos Realizados</h3>
-            <p class="stat-value"><%= totalSessions %></p>
+    <div class="page-header">
+        <h1 style="display:flex; align-items:center; gap:10px;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent-primary)" stroke-width="2"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/></svg>
+            Meus Treinos
+        </h1>
+        <p class="page-subtitle">Escolha o grupo muscular do dia e comece a treinar</p>
+    </div>
+
+    <!-- Stat -->
+    <div class="admin-stats-grid">
+        <div class="admin-stat-card is-primary">
+            <div class="admin-stat-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                Treinos Realizados
+            </div>
+            <span class="admin-stat-value"><%= totalSessions %></span>
         </div>
     </div>
 
-    <!-- Workout Plans Grid -->
-    <div class="workouts-grid">
-        <% if (plans.length > 0) { %>
-            <% plans.forEach(plan => { %>
-                <div class="workout-card">
-                    <div class="card-header">
-                        <h2><%= plan.name %></h2>
-                        <% if (plan.dayOfWeek) { %>
-                            <span class="day-badge"><%= plan.dayOfWeek %></span>
-                        <% } %>
-                    </div>
+    <!-- Workout Programs -->
+    <% if (plans.length > 0) { %>
+        <% plans.forEach(plan => { %>
+            <h2 class="section-title" style="display:flex; align-items:center; gap:8px;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+                <%= plan.name %>
+                <% if (plan.dayOfWeek) { %><span class="day-badge"><%= plan.dayOfWeek %></span><% } %>
+            </h2>
 
-                    <div class="card-body">
-                        <% if (plan.description) { %>
-                            <p class="description"><%= plan.description %></p>
-                        <% } %>
-
-                        <div class="card-stats">
-                            <div class="stat">
-                                <span class="stat-icon">💪</span>
-                                <span><%= plan.exercises.length %> exercícios</span>
-                            </div>
-                            <div class="stat">
-                                <span class="stat-icon">✅</span>
-                                <span><%= plan.sessions.length %> treinos</span>
-                            </div>
-                        </div>
-
-                        <!-- Exercise List -->
-                        <div class="exercises-preview">
-                            <% plan.exercises.slice(0, 5).forEach(ex => { %>
-                                <div class="exercise-preview">
-                                    <span><%= ex.name %></span>
-                                    <span class="sets-reps"><%= ex.sets %>x<%= ex.reps %></span>
+            <% if (plan.groups.length > 0) { %>
+                <div class="workouts-grid" style="margin-bottom: 28px;">
+                    <% plan.groups.forEach(group => { %>
+                        <div class="workout-card">
+                            <div class="card-header">
+                                <div class="section-card-title">
+                                    <span class="section-icon-badge">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6.5 6.5h11v11h-11z"/><path d="M2 12h2M20 12h2M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+                                    </span>
+                                    <h2><%= group.name %></h2>
                                 </div>
-                            <% }); %>
-                            <% if (plan.exercises.length > 5) { %>
-                                <div class="more-exercises">+<%= plan.exercises.length - 5 %> mais</div>
-                            <% } %>
-                        </div>
-                    </div>
+                            </div>
 
-                    <div class="card-footer">
-                        <form method="POST" action="/workouts/<%= plan.id %>/start" style="display: inline;">
-                            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-                            <button type="submit" class="btn btn-primary btn-lg">
-                                ▶ Iniciar Treino
-                            </button>
-                        </form>
-                    </div>
+                            <div class="card-body">
+                                <div class="card-stats">
+                                    <div class="stat">
+                                        <span class="stat-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/></svg></span>
+                                        <span><%= group.exercises.length %> exercícios</span>
+                                    </div>
+                                    <div class="stat">
+                                        <span class="stat-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg></span>
+                                        <span><%= group.sessions.length %> treinos</span>
+                                    </div>
+                                </div>
+
+                                <!-- Exercise List -->
+                                <% if (group.exercises.length > 0) { %>
+                                    <div class="exercises-preview">
+                                        <% group.exercises.slice(0, 5).forEach(ex => { %>
+                                            <div class="exercise-preview">
+                                                <span><%= ex.name %></span>
+                                                <span class="sets-reps"><%= ex.sets %>x<%= ex.reps %></span>
+                                            </div>
+                                        <% }); %>
+                                        <% if (group.exercises.length > 5) { %>
+                                            <div class="more-exercises">+<%= group.exercises.length - 5 %> mais</div>
+                                        <% } %>
+                                    </div>
+                                <% } else { %>
+                                    <p class="section-hint">Nenhum exercício cadastrado neste grupo.</p>
+                                <% } %>
+                            </div>
+
+                            <div class="card-footer">
+                                <form method="POST" action="/workouts/groups/<%= group.id %>/start" style="display: inline; width: 100%;">
+                                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                                    <button type="submit" class="btn btn-primary btn-lg" style="width: 100%; justify-content: center;">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                                        Iniciar Treino
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    <% }); %>
                 </div>
-            <% }); %>
-        <% } else { %>
-            <div class="empty-state">
-                <p>Nenhum plano de treino disponível</p>
-            </div>
-        <% } %>
-    </div>
+            <% } else { %>
+                <p class="section-hint" style="margin-bottom: 28px;">Nenhum grupo muscular cadastrado neste plano ainda.</p>
+            <% } %>
+        <% }); %>
+    <% } else { %>
+        <div class="empty-state">
+            <svg class="empty-state-icon-svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="display:block; margin:0 auto 14px; opacity:0.5;"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/></svg>
+            <p>Nenhum plano de treino disponível</p>
+            <small>Fale com seu instrutor para receber um plano de treino.</small>
+        </div>
+    <% } %>
 
     <!-- History Link -->
-    <div class="actions-section">
-        <a href="/workouts/history" class="btn btn-secondary">
-            📊 Ver Histórico de Treinos
-        </a>
-    </div>
+    <a href="/workouts/history" class="admin-action-card" style="margin-top: 20px;">
+        <span class="admin-action-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        </span>
+        <span class="admin-action-text">
+            <span class="admin-action-label">Histórico de Treinos</span>
+            <span class="admin-action-desc">Veja seus treinos concluídos e seu progresso ao longo do tempo</span>
+        </span>
+        <svg class="admin-action-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+    </a>
 </div>

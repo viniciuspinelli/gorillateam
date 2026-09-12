@@ -1,5 +1,34 @@
 // API Templates Controller - biblioteca de treinos/dietas (admin/instrutor)
 
+// Confirma que a refeição pertence a um MealPlan-template, e que o usuário atual
+// tem permissão sobre esse template (admin, ou o próprio instrutor que o criou).
+async function assertMealTemplateAccess(mealId, user) {
+  const result = await global.db.query(
+    `SELECT mp."userId", mp."isTemplate"
+     FROM "Meal" m JOIN "MealPlan" mp ON mp.id = m."mealPlanId"
+     WHERE m.id = $1`,
+    [mealId]
+  );
+  const row = result.rows[0];
+  if (!row || !row.isTemplate) return false;
+  return user.role === 'admin' || row.userId === user.id;
+}
+
+// Mesma verificação, mas a partir de um MealFood.
+async function assertFoodTemplateAccess(foodId, user) {
+  const result = await global.db.query(
+    `SELECT mp."userId", mp."isTemplate"
+     FROM "MealFood" mf
+     JOIN "Meal" m ON m.id = mf."mealId"
+     JOIN "MealPlan" mp ON mp.id = m."mealPlanId"
+     WHERE mf.id = $1`,
+    [foodId]
+  );
+  const row = result.rows[0];
+  if (!row || !row.isTemplate) return false;
+  return user.role === 'admin' || row.userId === user.id;
+}
+
 exports.getTemplates = async (req, res, next) => {
   try {
     const isAdmin = req.user.role === 'admin';
@@ -7,12 +36,14 @@ exports.getTemplates = async (req, res, next) => {
 
     const workoutsResult = isAdmin
       ? await global.db.query(
-          `SELECT wp.id, wp.name, wp.description, wp."dayOfWeek", COUNT(e.id) AS exercise_count
+          `SELECT wp.id, wp.name, wp.description, wp."dayOfWeek", COUNT(e.id) AS exercise_count,
+                  (SELECT COUNT(*) FROM "WorkoutGroup" wg WHERE wg."workoutPlanId" = wp.id) AS group_count
            FROM "WorkoutPlan" wp LEFT JOIN "Exercise" e ON e."workoutPlanId" = wp.id
            WHERE wp."isTemplate" = true GROUP BY wp.id ORDER BY wp.name ASC`
         )
       : await global.db.query(
-          `SELECT wp.id, wp.name, wp.description, wp."dayOfWeek", COUNT(e.id) AS exercise_count
+          `SELECT wp.id, wp.name, wp.description, wp."dayOfWeek", COUNT(e.id) AS exercise_count,
+                  (SELECT COUNT(*) FROM "WorkoutGroup" wg WHERE wg."workoutPlanId" = wp.id) AS group_count
            FROM "WorkoutPlan" wp LEFT JOIN "Exercise" e ON e."workoutPlanId" = wp.id
            WHERE wp."isTemplate" = true AND wp."userId" = $1 GROUP BY wp.id ORDER BY wp.name ASC`,
           [currentUserId]
@@ -89,7 +120,14 @@ exports.getDietTemplateMeals = async (req, res, next) => {
         `SELECT id, name, quantity, calories, protein, carbs, fat FROM "MealFood" WHERE "mealId" = $1 ORDER BY "order" ASC, id ASC`,
         [meal.id]
       );
-      return { ...meal, foods: foodsResult.rows };
+      const foods = await Promise.all(foodsResult.rows.map(async (food) => {
+        const optionsResult = await global.db.query(
+          `SELECT id, name, quantity, calories, protein, carbs, fat FROM "MealFoodOption" WHERE "mealFoodId" = $1 ORDER BY "order" ASC`,
+          [food.id]
+        );
+        return { ...food, options: optionsResult.rows };
+      }));
+      return { ...meal, foods };
     }));
     res.json({ success: true, meals });
   } catch (err) {
@@ -104,9 +142,12 @@ exports.addMeal = async (req, res, next) => {
     if (!name || !name.trim()) {
       return res.status(400).json({ success: false, message: 'Nome da refeição é obrigatório' });
     }
-    const planCheck = await global.db.query(`SELECT id FROM "MealPlan" WHERE id = $1 AND "isTemplate" = true`, [mealPlanId]);
+    const planCheck = await global.db.query(`SELECT "userId" FROM "MealPlan" WHERE id = $1 AND "isTemplate" = true`, [mealPlanId]);
     if (!planCheck.rows[0]) {
       return res.status(404).json({ success: false, message: 'Template não encontrado' });
+    }
+    if (req.user.role !== 'admin' && planCheck.rows[0].userId !== req.user.id) {
+      return res.status(403).json({ success: false, message: 'Acesso negado' });
     }
     const result = await global.db.query(
       `INSERT INTO "Meal" ("mealPlanId", name, "time", "order")
@@ -123,6 +164,9 @@ exports.addMeal = async (req, res, next) => {
 exports.deleteMeal = async (req, res, next) => {
   try {
     const mealId = parseInt(req.params.mealId, 10);
+    if (!(await assertMealTemplateAccess(mealId, req.user))) {
+      return res.status(404).json({ success: false, message: 'Refeição não encontrada' });
+    }
     await global.db.query(`DELETE FROM "MealFood" WHERE "mealId" = $1`, [mealId]);
     await global.db.query(`DELETE FROM "Meal" WHERE id = $1`, [mealId]);
     res.json({ success: true });
@@ -134,6 +178,9 @@ exports.deleteMeal = async (req, res, next) => {
 exports.addFood = async (req, res, next) => {
   try {
     const mealId = parseInt(req.params.mealId, 10);
+    if (!(await assertMealTemplateAccess(mealId, req.user))) {
+      return res.status(404).json({ success: false, message: 'Refeição não encontrada' });
+    }
     const { name, quantity, calories, protein, carbs, fat } = req.body;
     if (!name || !name.trim()) {
       return res.status(400).json({ success: false, message: 'Nome do alimento é obrigatório' });
@@ -150,9 +197,80 @@ exports.addFood = async (req, res, next) => {
   }
 };
 
+exports.updateFood = async (req, res, next) => {
+  try {
+    const foodId = parseInt(req.params.foodId, 10);
+    if (!(await assertFoodTemplateAccess(foodId, req.user))) {
+      return res.status(404).json({ success: false, message: 'Alimento não encontrado' });
+    }
+    const { name, quantity, calories, protein, carbs, fat, notes } = req.body;
+    if (!name || !name.trim()) {
+      return res.status(400).json({ success: false, message: 'Nome do alimento é obrigatório' });
+    }
+    const result = await global.db.query(
+      `UPDATE "MealFood" SET name = $1, quantity = $2, calories = $3, protein = $4, carbs = $5, fat = $6, notes = $7
+       WHERE id = $8 RETURNING id, name, quantity, calories, protein, carbs, fat, notes`,
+      [name.trim(), quantity || null, calories || 0, protein || 0, carbs || 0, fat || 0, notes?.trim() || null, foodId]
+    );
+    res.json({ success: true, food: result.rows[0] });
+  } catch (err) {
+    next(err);
+  }
+};
+
 exports.deleteFood = async (req, res, next) => {
   try {
-    await global.db.query(`DELETE FROM "MealFood" WHERE id = $1`, [parseInt(req.params.foodId, 10)]);
+    const foodId = parseInt(req.params.foodId, 10);
+    if (!(await assertFoodTemplateAccess(foodId, req.user))) {
+      return res.status(404).json({ success: false, message: 'Alimento não encontrado' });
+    }
+    await global.db.query(`DELETE FROM "MealFood" WHERE id = $1`, [foodId]);
+    res.json({ success: true });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.addFoodOption = async (req, res, next) => {
+  try {
+    const foodId = parseInt(req.params.foodId, 10);
+    if (!(await assertFoodTemplateAccess(foodId, req.user))) {
+      return res.status(404).json({ success: false, message: 'Alimento não encontrado' });
+    }
+    const { name, quantity, calories, protein, carbs, fat } = req.body;
+    if (!name || !name.trim()) {
+      return res.status(400).json({ success: false, message: 'Nome do substituto é obrigatório' });
+    }
+    const orderResult = await global.db.query(`SELECT COALESCE(MAX("order"), -1) + 1 AS next FROM "MealFoodOption" WHERE "mealFoodId" = $1`, [foodId]);
+    const result = await global.db.query(
+      `INSERT INTO "MealFoodOption" ("mealFoodId", name, quantity, calories, protein, carbs, fat, "order")
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+      [foodId, name.trim(), quantity || null, calories || null, protein || null, carbs || null, fat || null, orderResult.rows[0].next]
+    );
+    res.status(201).json({ success: true, option: result.rows[0] });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.deleteFoodOption = async (req, res, next) => {
+  try {
+    const optionId = parseInt(req.params.optionId, 10);
+    const result = await global.db.query(
+      `SELECT mp."userId", mp."isTemplate"
+       FROM "MealFoodOption" o
+       JOIN "MealFood" mf ON o."mealFoodId" = mf.id
+       JOIN "Meal" m ON m.id = mf."mealId"
+       JOIN "MealPlan" mp ON mp.id = m."mealPlanId"
+       WHERE o.id = $1`,
+      [optionId]
+    );
+    const row = result.rows[0];
+    const hasAccess = row && row.isTemplate && (req.user.role === 'admin' || row.userId === req.user.id);
+    if (!hasAccess) {
+      return res.status(404).json({ success: false, message: 'Substituto não encontrado' });
+    }
+    await global.db.query(`DELETE FROM "MealFoodOption" WHERE id = $1`, [optionId]);
     res.json({ success: true });
   } catch (err) {
     next(err);

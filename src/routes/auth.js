@@ -10,10 +10,13 @@ router.get('/login', authController.getLogin);
 // POST /auth/login
 router.post('/login', loginLimiter, authController.postLogin);
 
-// GET /auth/register
+// GET /auth/register (sem convite: mostra aviso de cadastro fechado)
 router.get('/register', authController.getRegister);
 
-// POST /auth/register
+// GET /auth/register/:token (link de convite de um instrutor/admin)
+router.get('/register/:token', authController.getRegister);
+
+// POST /auth/register (token de convite vai no corpo do formulário)
 router.post('/register', loginLimiter, authController.postRegister);
 
 // POST /auth/logout (POST para proteção CSRF)

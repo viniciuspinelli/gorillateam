@@ -82,7 +82,7 @@ exports.postProfile = async (req, res, next) => {
 
     if (hashedPassword) {
       await global.db.query(
-        `UPDATE "User" SET email = $1, "fullName" = $2, password = $3 WHERE id = $4`,
+        `UPDATE "User" SET email = $1, "fullName" = $2, password = $3, "passwordChangedAt" = NOW() WHERE id = $4`,
         [safeEmail, safeFullName, hashedPassword, userId]
       );
       // Invalidate all OTHER active sessions (keeps the current one alive)
