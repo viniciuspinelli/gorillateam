@@ -1,0 +1,181 @@
+<div class="evolution-page">
+    <div class="page-header">
+        <h1 style="display:flex; align-items:center; gap:10px;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent-primary)" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+            Minha Evolução
+        </h1>
+        <p class="page-subtitle">Registre seu peso e fotos periodicamente para acompanhar seu progresso</p>
+    </div>
+
+    <!-- WEIGHT SECTION -->
+    <div class="admin-detail-section" style="margin-bottom:20px;">
+        <div class="section-card-header">
+            <div class="section-card-title">
+                <span class="section-icon-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></span>
+                <h2>Peso Corporal</h2>
+            </div>
+            <button class="btn btn-sm btn-primary" onclick="togglePanel('add-weight')">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Registrar Peso
+            </button>
+        </div>
+
+        <div id="add-weight" class="assign-panel" style="display:none">
+            <span class="assign-panel-label">Peso de hoje</span>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                <input type="number" id="weightInput" step="0.1" min="1" max="999" placeholder="Ex: 78.5" style="flex:1; min-width:120px; padding:10px 12px; background:var(--bg-tertiary); border:1px solid var(--border-default); border-radius:var(--radius-sm); color:var(--text-primary);">
+                <input type="date" id="weightDateInput" style="padding:10px 12px; background:var(--bg-tertiary); border:1px solid var(--border-default); border-radius:var(--radius-sm); color:var(--text-primary);">
+            </div>
+            <div class="assign-panel-actions">
+                <button class="btn btn-primary btn-sm" onclick="submitWeight()">Salvar</button>
+                <button class="btn btn-secondary btn-sm" onclick="togglePanel('add-weight')">Cancelar</button>
+            </div>
+        </div>
+
+        <% if (weightLogs.length > 0) { %>
+            <div class="weight-chart-container">
+                <canvas id="weightChart"></canvas>
+            </div>
+            <div class="weight-log-list">
+                <% weightLogs.slice().reverse().forEach(w => { %>
+                    <div class="weight-log-row">
+                        <span><%= new Date(w.recordedAt + 'T00:00:00').toLocaleDateString('pt-BR') %></span>
+                        <span class="weight-log-value"><%= w.weight %> kg</span>
+                        <button class="btn-icon btn-icon-danger" onclick="deleteWeight(<%= w.id %>)" title="Remover registro">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+                        </button>
+                    </div>
+                <% }); %>
+            </div>
+        <% } else { %>
+            <div class="section-empty">
+                <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+                <p>Nenhum peso registrado ainda.</p>
+                <p class="section-empty-hint">Use o botão acima para registrar seu peso de hoje.</p>
+            </div>
+        <% } %>
+    </div>
+
+    <!-- PHOTOS SECTION -->
+    <div class="admin-detail-section">
+        <div class="section-card-header">
+            <div class="section-card-title">
+                <span class="section-icon-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></span>
+                <h2>Fotos de Progresso</h2>
+            </div>
+            <button class="btn btn-sm btn-primary" onclick="togglePanel('add-photo')">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Enviar Foto
+            </button>
+        </div>
+
+        <div id="add-photo" class="assign-panel" style="display:none">
+            <span class="assign-panel-label">Nova foto</span>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                <input type="file" id="photoInput" accept="image/*" style="flex:1; min-width:180px; color:var(--text-primary);">
+                <input type="date" id="photoDateInput" style="padding:10px 12px; background:var(--bg-tertiary); border:1px solid var(--border-default); border-radius:var(--radius-sm); color:var(--text-primary);">
+            </div>
+            <div class="assign-panel-actions">
+                <button class="btn btn-primary btn-sm" id="submitPhotoBtn" onclick="submitPhoto()">Enviar</button>
+                <button class="btn btn-secondary btn-sm" onclick="togglePanel('add-photo')">Cancelar</button>
+            </div>
+        </div>
+
+        <% if (photos.length > 0) { %>
+            <div class="photo-grid">
+                <% photos.forEach(p => { %>
+                    <div class="photo-grid-item">
+                        <img src="<%= p.publicUrl %>" alt="Foto de progresso" loading="lazy">
+                        <div class="photo-grid-caption">
+                            <span><%= new Date(p.takenAt + 'T00:00:00').toLocaleDateString('pt-BR') %></span>
+                            <button class="btn-icon btn-icon-danger" onclick="deletePhoto(<%= p.id %>)" title="Remover foto">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                <% }); %>
+            </div>
+        <% } else { %>
+            <div class="section-empty">
+                <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                <p>Nenhuma foto enviada ainda.</p>
+                <p class="section-empty-hint">Envie fotos periodicamente conforme seu instrutor solicitar.</p>
+            </div>
+        <% } %>
+    </div>
+</div>
+
+<script src="/vendor/chart.min.js"></script>
+<script src="/js/weightChart.js"></script>
+<script nonce="<%= nonce %>">
+    const csrfToken = '<%= csrfToken %>';
+    const weightLogs = <%- JSON.stringify(weightLogs) %>;
+
+    document.getElementById('weightDateInput').valueAsDate = new Date();
+    document.getElementById('photoDateInput').valueAsDate = new Date();
+
+    renderWeightChart('weightChart', weightLogs);
+
+    function togglePanel(id) {
+        const el = document.getElementById(id);
+        el.style.display = el.style.display === 'none' ? 'block' : 'none';
+    }
+
+    async function submitWeight() {
+        const weight = document.getElementById('weightInput').value;
+        const recordedAt = document.getElementById('weightDateInput').value;
+        if (!weight) return showToast('Informe o peso', 'error');
+        const res = await fetch('/body/weight', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+            body: JSON.stringify({ weight, recordedAt }),
+        });
+        const data = await res.json();
+        if (data.success) { showToast('Peso registrado!', 'success'); setTimeout(() => location.reload(), 600); }
+        else showToast(data.message || 'Erro', 'error');
+    }
+
+    async function deleteWeight(id) {
+        if (!(await askConfirm('Remover este registro de peso?'))) return;
+        const res = await fetch(`/body/weight/${id}`, { method: 'DELETE', headers: { 'X-CSRF-Token': csrfToken } });
+        const data = await res.json();
+        if (data.success) { showToast('Removido', 'success'); setTimeout(() => location.reload(), 600); }
+        else showToast(data.message || 'Erro', 'error');
+    }
+
+    async function submitPhoto() {
+        const fileInput = document.getElementById('photoInput');
+        const takenAt = document.getElementById('photoDateInput').value;
+        if (!fileInput.files[0]) return showToast('Selecione uma foto', 'error');
+
+        const btn = document.getElementById('submitPhotoBtn');
+        btn.disabled = true;
+
+        const formData = new FormData();
+        formData.append('photo', fileInput.files[0]);
+        formData.append('takenAt', takenAt);
+
+        try {
+            const res = await fetch('/body/photos', {
+                method: 'POST',
+                headers: { 'X-CSRF-Token': csrfToken },
+                body: formData,
+            });
+            const data = await res.json();
+            if (data.success) { showToast('Foto enviada!', 'success'); setTimeout(() => location.reload(), 600); }
+            else showToast(data.message || 'Erro', 'error');
+        } catch (err) {
+            showToast('Erro de conexão', 'error');
+        } finally {
+            btn.disabled = false;
+        }
+    }
+
+    async function deletePhoto(id) {
+        if (!(await askConfirm('Remover esta foto?'))) return;
+        const res = await fetch(`/body/photos/${id}`, { method: 'DELETE', headers: { 'X-CSRF-Token': csrfToken } });
+        const data = await res.json();
+        if (data.success) { showToast('Removida', 'success'); setTimeout(() => location.reload(), 600); }
+        else showToast(data.message || 'Erro', 'error');
+    }
+</script>

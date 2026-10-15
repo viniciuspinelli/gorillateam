@@ -136,8 +136,8 @@
     }
 
     // 🔧 Delete item with CSRF + error handling
-    function deleteItem(itemId) {
-        if (confirm('Tem certeza que deseja remover este item?')) {
+    async function deleteItem(itemId) {
+        if (await askConfirm('Tem certeza que deseja remover este item?')) {
             try {
                 fetch(`/shopping/items/${itemId}`, {
                     method: 'DELETE',
@@ -278,8 +278,8 @@
     }
 
     // 🔧 Clear checked items with CSRF + error handling
-    function clearChecked() {
-        if (confirm('Limpar todos os itens marcados? Esta ação não pode ser desfeita.')) {
+    async function clearChecked() {
+        if (await askConfirm('Limpar todos os itens marcados? Esta ação não pode ser desfeita.')) {
             try {
                 fetch(`/shopping/lists/${listId}/checked`, {
                     method: 'DELETE',

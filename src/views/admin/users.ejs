@@ -61,16 +61,21 @@
                     </div>
                 </div>
                 <div class="admin-user-actions">
-                    <a href="/admin/users/<%= u.id %>" class="btn btn-sm btn-secondary">Ver Planos</a>
-                    <a href="/admin/users/<%= u.id %>/edit" class="btn btn-sm btn-secondary">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
-                        Editar
-                    </a>
-                    <% if (u.id !== user.id) { %>
-                        <button class="btn btn-sm btn-danger js-delete-user" data-id="<%= u.id %>" data-username="<%= u.username %>" title="Excluir" aria-label="Excluir usuário">
-                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
-                        </button>
-                    <% } %>
+                    <a href="/admin/users/<%= u.id %>" class="btn btn-sm btn-secondary">Planos</a>
+                    <details class="row-menu">
+                        <summary class="btn btn-sm btn-secondary row-menu-trigger" aria-label="Mais ações de <%= u.username %>">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
+                        </summary>
+                        <div class="row-menu-panel">
+                            <a href="/admin/users/<%= u.id %>/evolution">Evolução</a>
+                            <% if (isAdmin || u.id !== user.id) { %>
+                            <a href="/admin/users/<%= u.id %>/edit">Editar</a>
+                            <% } %>
+                            <% if (u.id !== user.id) { %>
+                            <button type="button" class="row-menu-danger js-delete-user" data-id="<%= u.id %>" data-username="<%= u.username %>">Excluir usuário</button>
+                            <% } %>
+                        </div>
+                    </details>
                 </div>
             </div>
         <% }); %>
@@ -98,7 +103,7 @@ function copyInviteLink() {
 }
 
 async function regenerateInviteLink() {
-    if (!confirm('Gerar um novo link? O link atual deixará de funcionar.')) return;
+    if (!(await askConfirm('Gerar um novo link? O link atual deixará de funcionar.'))) return;
     try {
         const res = await fetch('/admin/users/invite-link/regenerate', {
             method: 'POST',
@@ -117,10 +122,11 @@ async function regenerateInviteLink() {
 }
 
 document.querySelectorAll('.js-delete-user').forEach(function(btn) {
-    btn.addEventListener('click', function() {
+    btn.addEventListener('click', async function() {
         const id = this.dataset.id;
         const username = this.dataset.username;
-        if (!confirm(`Deletar o usuário "${username}"? Todos os dados serão removidos.`)) return;
+        this.closest('details')?.removeAttribute('open');
+        if (!(await askConfirm(`Deletar o usuário "${username}"? Todos os dados serão removidos.`))) return;
         fetch(`/admin/users/${id}`, {
             method: 'DELETE',
             headers: { 'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').content }

@@ -1,5 +1,6 @@
 // API Workout Controller - versão JSON das rotas de treino (usada pelo app mobile)
 const { getStorageProvider } = require('../../services/storage');
+const { sendPushToUser } = require('../../services/pushNotifications');
 
 const storageProvider = getStorageProvider();
 
@@ -60,7 +61,8 @@ exports.getWorkouts = async (req, res, next) => {
           'SELECT id FROM "WorkoutSession" WHERE "userId" = $1 AND "workoutGroupId" = $2 AND "isCompleted" = true',
           [userId, group.id]
         );
-        return { ...group, exercises, sessions: groupSessionsResult.rows };
+        const totalSets = exercises.reduce((sum, ex) => sum + (ex.sets || 0), 0);
+        return { ...group, exercises, sessions: groupSessionsResult.rows, totalSets };
       }));
 
       return { ...plan, groups };
@@ -134,7 +136,7 @@ exports.getHistory = async (req, res, next) => {
     const userId = req.user.id;
 
     const sessionsResult = await global.db.query(
-      `SELECT ws.id, ws."workoutPlanId", ws."startedAt", ws."completedAt", ws."durationMin", ws."notes",
+      `SELECT ws.id, ws."workoutPlanId", ws."startedAt", ws."completedAt", ws."durationMin", ws."notes", ws."instructorReply",
               wp.name as plan_name, wg.name as group_name
        FROM "WorkoutSession" ws
        JOIN "WorkoutPlan" wp ON ws."workoutPlanId" = wp.id
@@ -144,15 +146,24 @@ exports.getHistory = async (req, res, next) => {
       [userId]
     );
 
-    const sessions = sessionsResult.rows.map((row) => ({
-      id: row.id,
-      workoutPlanId: row.workoutPlanId,
-      startedAt: row.startedAt,
-      completedAt: row.completedAt,
-      durationMin: row.durationMin,
-      notes: row.notes,
-      planName: row.plan_name,
-      groupName: row.group_name,
+    const sessions = await Promise.all(sessionsResult.rows.map(async (row) => {
+      const exercisesResult = await global.db.query(
+        `SELECT se.id, se."isCompleted", se."actualWeight", se."actualReps", e.name, e.sets, e.reps
+         FROM "SessionExercise" se JOIN "Exercise" e ON se."exerciseId" = e.id
+         WHERE se."workoutSessionId" = $1 ORDER BY e."order" ASC`,
+        [row.id]
+      );
+      return {
+        id: row.id,
+        workoutPlanId: row.workoutPlanId,
+        startedAt: row.startedAt,
+        completedAt: row.completedAt,
+        durationMin: row.durationMin,
+        notes: row.notes,
+        planName: row.plan_name,
+        groupName: row.group_name,
+        sessionExercises: exercisesResult.rows,
+      };
     }));
 
     res.json({ success: true, sessions, totalSessions: sessions.length });
@@ -173,14 +184,30 @@ exports.getActiveWorkout = async (req, res, next) => {
     );
     if (!sessionResult.rows[0]) return res.status(404).json({ success: false, message: 'Sessão de treino não encontrada' });
     const exercisesResult = await global.db.query(
-      `SELECT se.id AS "sessionExerciseId", se."isCompleted", e.id, e.name, e.sets, e.reps, e.weight,
+      `SELECT se.id AS "sessionExerciseId", se."isCompleted", se."actualWeight", se."actualReps", e.id, e.name, e.sets, e.reps, e.weight,
        (SELECT "publicUrl" FROM "WorkoutExerciseImage" WHERE "exerciseId" = e.id ORDER BY "sortOrder", id LIMIT 1) AS image
        FROM "SessionExercise" se JOIN "Exercise" e ON e.id = se."exerciseId"
        WHERE se."workoutSessionId" = $1 ORDER BY e."order" ASC`,
       [sessionId]
     );
+    const exerciseIds = exercisesResult.rows.map((exercise) => exercise.id);
+    const lastUsedResult = exerciseIds.length > 0
+      ? await global.db.query(
+          `SELECT DISTINCT ON (se."exerciseId") se."exerciseId", se."actualWeight", se."actualReps"
+           FROM "SessionExercise" se
+           JOIN "WorkoutSession" ws ON ws.id = se."workoutSessionId"
+           WHERE ws."userId" = $1 AND ws."isCompleted" = true AND ws.id <> $2
+             AND se."exerciseId" = ANY($3::int[]) AND se."actualWeight" IS NOT NULL
+           ORDER BY se."exerciseId", ws."completedAt" DESC`,
+          [req.user.id, sessionId, exerciseIds]
+        )
+      : { rows: [] };
+    const lastUsedByExerciseId = new Map(lastUsedResult.rows.map((row) => [row.exerciseId, row]));
+
     const exercises = exercisesResult.rows.map((exercise) => ({
       ...exercise,
+      lastWeight: lastUsedByExerciseId.get(exercise.id)?.actualWeight || null,
+      lastReps: lastUsedByExerciseId.get(exercise.id)?.actualReps || null,
       image: resolveImageUrl(req, exercise.image),
     }));
     res.json({ success: true, session: sessionResult.rows[0], exercises });
@@ -189,11 +216,12 @@ exports.getActiveWorkout = async (req, res, next) => {
 
 exports.completeExercise = async (req, res, next) => {
   try {
+    const { actualWeight, actualReps } = req.body || {};
     const result = await global.db.query(
-      `UPDATE "SessionExercise" se SET "isCompleted" = true, "completedAt" = NOW()
+      `UPDATE "SessionExercise" se SET "isCompleted" = true, "completedAt" = NOW(), "actualWeight" = $4, "actualReps" = $5
        FROM "WorkoutSession" ws WHERE se.id = $1 AND se."workoutSessionId" = $2
        AND ws.id = se."workoutSessionId" AND ws."userId" = $3 AND ws."isCompleted" = false RETURNING se.id`,
-      [parseInt(req.params.sessionExerciseId, 10), parseInt(req.params.sessionId, 10), req.user.id]
+      [parseInt(req.params.sessionExerciseId, 10), parseInt(req.params.sessionId, 10), req.user.id, actualWeight?.trim() || null, actualReps?.trim() || null]
     );
     if (!result.rows[0]) return res.status(404).json({ success: false, message: 'Exercício não encontrado' });
     res.json({ success: true });
@@ -202,12 +230,26 @@ exports.completeExercise = async (req, res, next) => {
 
 exports.completeWorkout = async (req, res, next) => {
   try {
+    const { durationMin, notes } = req.body || {};
     const result = await global.db.query(
-      `UPDATE "WorkoutSession" SET "isCompleted" = true, "completedAt" = NOW(), "durationMin" = $1
+      `UPDATE "WorkoutSession" SET "isCompleted" = true, "completedAt" = NOW(), "durationMin" = $1, "notes" = $4
        WHERE id = $2 AND "userId" = $3 AND "isCompleted" = false RETURNING id`,
-      [parseInt(req.body.durationMin, 10) || 0, parseInt(req.params.sessionId, 10), req.user.id]
+      [parseInt(durationMin, 10) || 0, parseInt(req.params.sessionId, 10), req.user.id, notes?.trim() || null]
     );
     if (!result.rows[0]) return res.status(404).json({ success: false, message: 'Sessão de treino não encontrada' });
+
+    if (notes?.trim()) {
+      const studentResult = await global.db.query('SELECT "instructorId", "fullName", username FROM "User" WHERE id = $1', [req.user.id]);
+      const student = studentResult.rows[0];
+      if (student?.instructorId) {
+        sendPushToUser(student.instructorId, {
+          title: 'Novo feedback de treino',
+          body: `${student.fullName || student.username} comentou sobre o treino de hoje.`,
+          data: { type: 'workout_feedback', studentId: req.user.id },
+        });
+      }
+    }
+
     res.json({ success: true });
   } catch (error) { next(error); }
 };
@@ -248,6 +290,30 @@ exports.deleteWorkoutPlan = async (req, res, next) => {
     await global.db.query(`DELETE FROM "WorkoutGroup" WHERE "workoutPlanId" = $1`, [planId]);
     await global.db.query(`DELETE FROM "WorkoutPlan" WHERE id = $1`, [planId]);
     res.json({ success: true });
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.getWorkoutGroups = async (req, res, next) => {
+  try {
+    const { planId } = req.params;
+    const planCheck = await global.db.query('SELECT id FROM "WorkoutPlan" WHERE id = $1 AND "userId" = $2', [parseInt(planId, 10), req.user.id]);
+    if (planCheck.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Plano não encontrado' });
+    }
+    const result = await global.db.query(
+      `SELECT wg.id, wg.name, wg."order", COUNT(e.id) AS exercise_count, COALESCE(SUM(e.sets), 0) AS total_sets
+       FROM "WorkoutGroup" wg LEFT JOIN "Exercise" e ON e."workoutGroupId" = wg.id
+       WHERE wg."workoutPlanId" = $1 GROUP BY wg.id ORDER BY wg."order" ASC`,
+      [parseInt(planId, 10)]
+    );
+    const groups = result.rows.map((g) => ({
+      ...g,
+      exercise_count: parseInt(g.exercise_count, 10),
+      total_sets: parseInt(g.total_sets, 10),
+    }));
+    res.json({ success: true, groups });
   } catch (error) {
     next(error);
   }

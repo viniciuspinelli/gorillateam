@@ -39,7 +39,7 @@
                 <div class="muscle-group-card" id="group-card-<%= group.id %>">
                     <div class="muscle-group-row">
                         <span class="muscle-group-name" id="group-name-<%= group.id %>"><%= group.name %></span>
-                        <span class="badge-count" id="group-excnt-<%= group.id %>"><%= group.exercise_count %> exerc.</span>
+                        <span class="badge-count"><span id="group-excnt-<%= group.id %>"><%= group.exercise_count %> exerc.</span> · <%= group.total_sets %> séries</span>
                         <div class="muscle-group-actions">
                             <button class="btn-icon" onclick="renameGroup(<%= group.id %>)" title="Renomear grupo">
                                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
@@ -72,16 +72,6 @@
                                             <input type="text" name="name" placeholder="ex: Supino" required>
                                         </div>
                                         <div class="form-group">
-                                            <label>Series *</label>
-                                            <input type="number" name="sets" placeholder="4" min="1" max="20" required>
-                                        </div>
-                                        <div class="form-group">
-                                            <label>Reps *</label>
-                                            <input type="text" name="reps" placeholder="8-12" required>
-                                        </div>
-                                    </div>
-                                    <div class="form-grid-3">
-                                        <div class="form-group">
                                             <label>Carga</label>
                                             <input type="text" name="weight" placeholder="60kg">
                                         </div>
@@ -89,10 +79,15 @@
                                             <label>Descanso (seg)</label>
                                             <input type="number" name="restSeconds" placeholder="60" min="0">
                                         </div>
-                                        <div class="form-group">
-                                            <label>Notas</label>
-                                            <input type="text" name="notes" placeholder="Dicas...">
-                                        </div>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Séries × Repetições *</label>
+                                        <div class="sets-builder" data-sets-builder></div>
+                                        <button type="button" class="sets-builder-add" onclick="addSetVariation(this)">+ Adicionar variação (ex: 1x20, 2x8)</button>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Notas</label>
+                                        <input type="text" name="notes" placeholder="Dicas...">
                                     </div>
                                     <div class="form-grid-3">
                                         <div class="form-group">

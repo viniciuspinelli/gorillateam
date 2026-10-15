@@ -363,7 +363,7 @@ async function submitDtAddMeal(e, planId) {
 }
 
 async function deleteDtMeal(mealId, planId, name) {
-    if (!confirm('Remover refeição "' + name + '"?')) return;
+    if (!(await askConfirm('Remover refeição "' + name + '"?'))) return;
     try {
         const r = await fetch('/diet/meals/' + mealId, { method: 'DELETE', headers: { 'X-CSRF-Token': csrfToken } });
         const d = await r.json();
@@ -414,7 +414,7 @@ async function submitDtAddFood(e, mealId, planId) {
 }
 
 async function deleteDtFood(foodId, planId) {
-    if (!confirm('Remover este alimento?')) return;
+    if (!(await askConfirm('Remover este alimento?'))) return;
     try {
         const r = await fetch('/diet/foods/' + foodId, { method: 'DELETE', headers: { 'X-CSRF-Token': csrfToken } });
         const d = await r.json();
@@ -428,7 +428,7 @@ async function deleteDtFood(foodId, planId) {
 // ══════════════════════════════════════════════════════════════════
 
 async function deleteTemplate(type, id, name) {
-    if (!confirm(`Remover o template "${name}" da biblioteca?`)) return;
+    if (!(await askConfirm(`Remover o template "${name}" da biblioteca?`))) return;
     const url = type === 'workout'
         ? `/admin/templates/workouts/${id}`
         : `/admin/templates/diets/${id}`;

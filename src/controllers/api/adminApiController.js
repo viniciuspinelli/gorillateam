@@ -1,4 +1,5 @@
 // API Admin Controller - versão JSON do painel admin/instrutor (usada pelo app mobile)
+const { sendPushToUser } = require('../../services/pushNotifications');
 
 exports.getDashboard = async (req, res, next) => {
   try {
@@ -55,7 +56,7 @@ exports.getUsers = async (req, res, next) => {
         )
       : await global.db.query(
           `SELECT id, username, "fullName", role, "createdAt" FROM "User"
-           WHERE "instructorId" = $1
+           WHERE "instructorId" = $1 OR id = $1
            ORDER BY "createdAt" DESC`,
           [currentUserId]
         );
@@ -78,7 +79,7 @@ exports.getUserDetail = async (req, res, next) => {
     }
     const targetUser = userResult.rows[0];
 
-    if (!isAdmin && targetUser.instructorId !== currentUserId) {
+    if (!isAdmin && targetUser.instructorId !== currentUserId && targetUser.id !== currentUserId) {
       return res.status(403).json({ success: false, message: 'Acesso negado' });
     }
 
@@ -97,6 +98,35 @@ exports.getUserDetail = async (req, res, next) => {
       ? await global.db.query(`SELECT id, name FROM "MealPlan" WHERE "isTemplate" = true ORDER BY name ASC`)
       : await global.db.query(`SELECT id, name FROM "MealPlan" WHERE "isTemplate" = true AND "userId" = $1 ORDER BY name ASC`, [currentUserId]);
 
+    const sessionsResult = await global.db.query(
+      `SELECT ws.id, ws."completedAt", ws."durationMin", ws."notes",
+              wp.name as plan_name, wg.name as group_name
+       FROM "WorkoutSession" ws
+       JOIN "WorkoutPlan" wp ON ws."workoutPlanId" = wp.id
+       LEFT JOIN "WorkoutGroup" wg ON ws."workoutGroupId" = wg.id
+       WHERE ws."userId" = $1 AND ws."isCompleted" = true
+       ORDER BY ws."completedAt" DESC
+       LIMIT 20`,
+      [userId]
+    );
+    const workoutSessions = await Promise.all(sessionsResult.rows.map(async (row) => {
+      const exercisesResult = await global.db.query(
+        `SELECT se.id, se."actualWeight", se."actualReps", e.name, e.sets, e.reps
+         FROM "SessionExercise" se JOIN "Exercise" e ON se."exerciseId" = e.id
+         WHERE se."workoutSessionId" = $1 ORDER BY e."order" ASC`,
+        [row.id]
+      );
+      return {
+        id: row.id,
+        completedAt: row.completedAt,
+        durationMin: row.durationMin,
+        notes: row.notes,
+        planName: row.plan_name,
+        groupName: row.group_name,
+        sessionExercises: exercisesResult.rows,
+      };
+    }));
+
     res.json({
       success: true,
       targetUser,
@@ -104,6 +134,7 @@ exports.getUserDetail = async (req, res, next) => {
       diets: dietsResult.rows,
       workoutTemplates: workoutTemplatesResult.rows,
       dietTemplates: dietTemplatesResult.rows,
+      workoutSessions,
     });
   } catch (err) {
     next(err);
@@ -120,7 +151,7 @@ exports.assignWorkout = async (req, res, next) => {
 
     if (!isAdmin) {
       const studentCheck = await client.query(`SELECT "instructorId" FROM "User" WHERE id = $1`, [userId]);
-      if (!studentCheck.rows[0] || studentCheck.rows[0].instructorId !== currentUserId) {
+      if (!studentCheck.rows[0] || (studentCheck.rows[0].instructorId !== currentUserId && userId !== currentUserId)) {
         return res.status(403).json({ success: false, message: 'Acesso negado' });
       }
     }
@@ -180,6 +211,7 @@ exports.assignWorkout = async (req, res, next) => {
     }
 
     await client.query('COMMIT');
+    sendPushToUser(userId, { title: 'Novo treino disponível', body: `${template.name} foi atribuído a você.`, data: { type: 'workout_assigned', planId: newPlanId } });
     res.json({ success: true });
   } catch (err) {
     await client.query('ROLLBACK');
@@ -199,7 +231,7 @@ exports.assignDiet = async (req, res, next) => {
 
     if (!isAdmin) {
       const studentCheck = await client.query(`SELECT "instructorId" FROM "User" WHERE id = $1`, [userId]);
-      if (!studentCheck.rows[0] || studentCheck.rows[0].instructorId !== currentUserId) {
+      if (!studentCheck.rows[0] || (studentCheck.rows[0].instructorId !== currentUserId && userId !== currentUserId)) {
         return res.status(403).json({ success: false, message: 'Acesso negado' });
       }
     }
@@ -263,6 +295,7 @@ exports.assignDiet = async (req, res, next) => {
     }
 
     await client.query('COMMIT');
+    sendPushToUser(userId, { title: 'Nova dieta disponível', body: `${template.name} foi atribuída a você.`, data: { type: 'diet_assigned', planId: newPlanId } });
     res.json({ success: true });
   } catch (err) {
     await client.query('ROLLBACK');
@@ -278,7 +311,7 @@ exports.removeWorkout = async (req, res, next) => {
     const planId = parseInt(req.params.planId, 10);
     if (req.user.role !== 'admin') {
       const studentCheck = await global.db.query(`SELECT "instructorId" FROM "User" WHERE id = $1`, [userId]);
-      if (!studentCheck.rows[0] || studentCheck.rows[0].instructorId !== req.user.id) {
+      if (!studentCheck.rows[0] || (studentCheck.rows[0].instructorId !== req.user.id && userId !== req.user.id)) {
         return res.status(403).json({ success: false, message: 'Acesso negado' });
       }
     }
@@ -297,7 +330,7 @@ exports.removeDiet = async (req, res, next) => {
     const planId = parseInt(req.params.planId, 10);
     if (req.user.role !== 'admin') {
       const studentCheck = await global.db.query(`SELECT "instructorId" FROM "User" WHERE id = $1`, [userId]);
-      if (!studentCheck.rows[0] || studentCheck.rows[0].instructorId !== req.user.id) {
+      if (!studentCheck.rows[0] || (studentCheck.rows[0].instructorId !== req.user.id && userId !== req.user.id)) {
         return res.status(403).json({ success: false, message: 'Acesso negado' });
       }
     }

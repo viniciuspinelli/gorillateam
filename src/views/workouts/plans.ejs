@@ -206,7 +206,7 @@ async function renameGroup(groupId) {
 
 // --- Grupo Muscular: remover ---
 async function deleteGroup(groupId, planId, name) {
-    if (!confirm('Remover o grupo "' + name + '"? Os exercicios dele serao removidos.')) return;
+    if (!(await askConfirm('Remover o grupo "' + name + '"? Os exercicios dele serao removidos.'))) return;
     try {
         const r = await fetch('/workouts/groups/' + groupId, { method: 'DELETE', headers: { 'X-CSRF-Token': _csrf } });
         const d = await r.json();
@@ -244,7 +244,7 @@ function toggleGroupExercises(groupId) {
 
 // --- Deletar Plano ---
 async function deletePlan(id, name) {
-    if (!confirm('Deletar "' + name + '"? Os exercicios serao removidos.')) return;
+    if (!(await askConfirm('Deletar "' + name + '"? Os exercicios serao removidos.'))) return;
     try {
         const r = await fetch('/workouts/plans/' + id, { method: 'DELETE', headers: { 'X-CSRF-Token': _csrf } });
         const d = await r.json();
@@ -281,7 +281,7 @@ async function loadExercises(groupId) {
                 '<div class="exercise-row-info">' +
                     '<span class="exercise-row-name">' + escHtml(ex.name) + '</span>' +
                     '<div class="exercise-row-meta">' +
-                        '<span class="meta-pill">' + escHtml(ex.sets) + 'x' + escHtml(ex.reps) + '</span>' +
+                        '<span class="meta-pill">' + escHtml(SetsReps.format(ex.sets, ex.reps)) + '</span>' +
                         (ex.weight ? '<span class="meta-pill">' + escHtml(ex.weight) + '</span>' : '') +
                         (ex.restSeconds ? '<span class="meta-pill">' + escHtml(ex.restSeconds) + 's</span>' : '') +
                         (ex.notes ? '<span class="meta-pill meta-notes">' + escHtml(ex.notes) + '</span>' : '') +
@@ -392,7 +392,7 @@ async function loadExerciseImages(exerciseId) {
 }
 
 async function deleteExImage(exerciseId, imageId) {
-    if (!confirm('Excluir esta imagem?')) return;
+    if (!(await askConfirm('Excluir esta imagem?'))) return;
     try {
         const r = await fetch('/workouts/exercises/' + exerciseId + '/images/' + imageId, {
             method: 'DELETE',
@@ -410,6 +410,53 @@ async function deleteExImage(exerciseId, imageId) {
     }
 }
 
+// --- Series x Repeticoes (variacoes, ex: 1x20 + 2x8) ---
+function setVariationRow(v) {
+    return '<div class="sets-builder-row">' +
+        '<input class="inline-input sv-sets" type="number" min="1" max="20" placeholder="Séries" value="' + escHtml(v.sets) + '" required>' +
+        '<span class="sets-builder-x">x</span>' +
+        '<input class="inline-input sv-reps" type="text" placeholder="Reps (ex: 8-12)" value="' + escHtml(v.reps) + '" required>' +
+        '<button type="button" class="btn-icon btn-icon-danger" onclick="removeSetVariation(this)" title="Remover variação">' +
+            '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' +
+        '</button>' +
+    '</div>';
+}
+
+function renderSetsBuilder(builder, variations) {
+    builder.innerHTML = variations.map(setVariationRow).join('');
+    updateSetsBuilder(builder);
+}
+
+// O botao de remover so aparece quando ha mais de uma variacao
+function updateSetsBuilder(builder) {
+    const rows = builder.querySelectorAll('.sets-builder-row');
+    rows.forEach(r => { r.querySelector('.btn-icon').style.visibility = rows.length > 1 ? 'visible' : 'hidden'; });
+}
+
+function addSetVariation(btn) {
+    const builder = btn.closest('form').querySelector('[data-sets-builder]');
+    builder.insertAdjacentHTML('beforeend', setVariationRow({ sets: '', reps: '' }));
+    updateSetsBuilder(builder);
+    builder.lastElementChild.querySelector('.sv-sets').focus();
+}
+
+function removeSetVariation(btn) {
+    const builder = btn.closest('[data-sets-builder]');
+    btn.closest('.sets-builder-row').remove();
+    updateSetsBuilder(builder);
+}
+
+function readSetsBuilder(form) {
+    const variations = Array.from(form.querySelectorAll('[data-sets-builder] .sets-builder-row')).map(r => ({
+        sets: parseInt(r.querySelector('.sv-sets').value, 10),
+        reps: r.querySelector('.sv-reps').value.trim()
+    }));
+    const result = SetsReps.fromVariations(variations);
+    if (!result) { toast('Informe séries e repetições', 'error'); return null; }
+    if (result.reps.length > 200) { toast('Repetições muito longas, simplifique as variações', 'error'); return null; }
+    return result;
+}
+
 // --- Editar Exercicio (inline) ---
 function showExEditForm(id, groupId, name, sets, reps, weight, rest, notes) {
     const row = document.getElementById('exrow-' + id);
@@ -417,29 +464,32 @@ function showExEditForm(id, groupId, name, sets, reps, weight, rest, notes) {
         '<form class="exercise-inline-edit" onsubmit="saveExInline(event,' + id + ',' + groupId + ')">' +
             '<div class="inline-edit-grid">' +
                 '<input class="inline-input inline-input-wide" type="text" name="name" value="' + escHtml(name) + '" placeholder="Nome" required>' +
-                '<input class="inline-input" type="number" name="sets" value="' + sets + '" min="1" max="20" placeholder="Series" required>' +
-                '<input class="inline-input" type="text" name="reps" value="' + escHtml(reps) + '" placeholder="Reps" required>' +
                 '<input class="inline-input" type="text" name="weight" value="' + escHtml(weight) + '" placeholder="Carga">' +
                 '<input class="inline-input" type="number" name="restSeconds" value="' + (rest||'') + '" placeholder="Desc(s)">' +
                 '<input class="inline-input inline-input-wide" type="text" name="notes" value="' + escHtml(notes) + '" placeholder="Notas">' +
             '</div>' +
+            '<div class="sets-builder" data-sets-builder></div>' +
+            '<button type="button" class="sets-builder-add" onclick="addSetVariation(this)">+ Adicionar variação</button>' +
             '<div class="inline-edit-actions">' +
                 '<button type="submit" class="btn btn-primary btn-sm">Salvar</button>' +
                 '<button type="button" class="btn btn-secondary btn-sm" onclick="loadExercises(' + groupId + ')">Cancelar</button>' +
             '</div>' +
         '</form>';
+    renderSetsBuilder(row.querySelector('[data-sets-builder]'), SetsReps.toVariations(sets, reps));
     row.querySelector('[name="name"]').focus();
 }
 
 async function saveExInline(e, id, groupId) {
     e.preventDefault();
     const fd = new FormData(e.target);
+    const setsReps = readSetsBuilder(e.target);
+    if (!setsReps) return;
     const btn = e.target.querySelector('[type="submit"]');
     btn.disabled = true; btn.textContent = 'Salvando...';
     const body = {
         name: fd.get('name'),
-        sets: fd.get('sets'),
-        reps: fd.get('reps'),
+        sets: setsReps.sets,
+        reps: setsReps.reps,
         weight: fd.get('weight') || null,
         restSeconds: fd.get('restSeconds') || null,
         notes: fd.get('notes') || null
@@ -458,19 +508,25 @@ function toggleAddEx(groupId) {
     const form = document.getElementById('add-form-' + groupId);
     const isOpen = form.style.display === 'none' || !form.style.display;
     form.style.display = isOpen ? 'block' : 'none';
-    if (isOpen) form.querySelector('[name="name"]').focus();
+    if (isOpen) {
+        const builder = form.querySelector('[data-sets-builder]');
+        if (!builder.children.length) renderSetsBuilder(builder, [{ sets: '', reps: '' }]);
+        form.querySelector('[name="name"]').focus();
+    }
 }
 
 async function submitAddEx(e, groupId) {
     e.preventDefault();
     const fd = new FormData(e.target);
+    const setsReps = readSetsBuilder(e.target);
+    if (!setsReps) return;
     const btn = e.target.querySelector('[type="submit"]');
     btn.disabled = true;
     try {
         const r = await fetch('/workouts/groups/' + groupId + '/exercises', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': _csrf },
-            body: JSON.stringify({ name: fd.get('name'), sets: fd.get('sets'), reps: fd.get('reps'), weight: fd.get('weight')||null, restSeconds: fd.get('restSeconds')||null, notes: fd.get('notes')||null })
+            body: JSON.stringify({ name: fd.get('name'), sets: setsReps.sets, reps: setsReps.reps, weight: fd.get('weight')||null, restSeconds: fd.get('restSeconds')||null, notes: fd.get('notes')||null })
         });
         const d = await r.json();
         if (d.success) {
@@ -487,6 +543,7 @@ async function submitAddEx(e, groupId) {
 
             toast('Exercicio adicionado!', 'success');
             e.target.reset();
+            e.target.querySelector('[data-sets-builder]').innerHTML = '';
             document.getElementById('add-form-' + groupId).style.display = 'none';
             loadExercises(groupId);
             const badge = document.getElementById('group-excnt-' + groupId);
@@ -516,7 +573,7 @@ async function uploadExerciseImageFile(exerciseId, file) {
 
 // --- Deletar Exercicio ---
 async function deleteEx(id, groupId, name) {
-    if (!confirm('Deletar "' + name + '"?')) return;
+    if (!(await askConfirm('Deletar "' + name + '"?'))) return;
     try {
         const r = await fetch('/workouts/exercises/' + id, { method: 'DELETE', headers: { 'X-CSRF-Token': _csrf, 'Accept': 'application/json' } });
         const d = await r.json();

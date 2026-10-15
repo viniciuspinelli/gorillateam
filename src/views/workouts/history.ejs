@@ -43,6 +43,24 @@
                                         <strong>Notas:</strong> <%= session.notes %>
                                     </div>
                                 <% } %>
+                                <% if (session.instructorReply) { %>
+                                    <div class="instructor-reply-received">
+                                        <strong>Resposta do seu instrutor:</strong> <%= session.instructorReply %>
+                                    </div>
+                                <% } %>
+
+                                <button type="button" class="btn-toggle-session-detail" data-session-id="<%= session.id %>">Ver exercícios</button>
+                                <div class="session-detail" id="sessionDetail-<%= session.id %>" style="display:none;">
+                                    <% session.sessionExercises.forEach(se => { %>
+                                        <div class="session-detail-row">
+                                            <span class="ex-name"><%= se.name %></span>
+                                            <span class="ex-planned"><%= formatSetsReps(se.sets, se.reps) %></span>
+                                            <% if (se.actualWeight || se.actualReps) { %>
+                                                <span class="ex-actual"><%= [se.actualWeight, se.actualReps].filter(Boolean).join(' · ') %></span>
+                                            <% } %>
+                                        </div>
+                                    <% }); %>
+                                </div>
                             </div>
                         </div>
                     <% }); %>
@@ -56,3 +74,15 @@
         </div>
     <% } %>
 </div>
+
+<script nonce="<%= nonce %>">
+    document.querySelectorAll('.btn-toggle-session-detail').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const detail = document.getElementById(`sessionDetail-${btn.dataset.sessionId}`);
+            if (!detail) return;
+            const isHidden = detail.style.display === 'none';
+            detail.style.display = isHidden ? 'block' : 'none';
+            btn.textContent = isHidden ? 'Ocultar exercícios' : 'Ver exercícios';
+        });
+    });
+</script>

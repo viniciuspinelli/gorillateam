@@ -18,19 +18,62 @@
         </div>
     </div>
 
+    <!-- Active Workout (pinned) -->
+    <% if (activeSessions && activeSessions.length > 0) { %>
+        <div class="active-workout-banner">
+            <div class="active-workout-banner-title">
+                <span class="live-dot"></span>
+                Treino em andamento
+            </div>
+            <% activeSessions.forEach(s => { %>
+                <div class="active-workout-item">
+                    <div class="active-workout-info">
+                        <strong><%= s.groupName %></strong>
+                        <span><%= s.planName %></span>
+                    </div>
+                    <a href="/workouts/session/<%= s.id %>" class="btn btn-primary">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                        Continuar Treino
+                    </a>
+                </div>
+            <% }); %>
+        </div>
+    <% } %>
+
     <!-- Workout Programs -->
     <% if (plans.length > 0) { %>
         <% plans.forEach(plan => { %>
+            <%
+                let planExpiryDaysLeft = null;
+                if (plan.expiresAt) {
+                    planExpiryDaysLeft = Math.ceil((new Date(plan.expiresAt) - Date.now()) / 86400000);
+                }
+            %>
             <h2 class="section-title" style="display:flex; align-items:center; gap:8px;">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
                 <%= plan.name %>
                 <% if (plan.dayOfWeek) { %><span class="day-badge"><%= plan.dayOfWeek %></span><% } %>
             </h2>
 
+            <% if (planExpiryDaysLeft !== null && planExpiryDaysLeft <= 14) { %>
+                <div class="plan-expiry-notice <%= planExpiryDaysLeft < 0 ? 'is-expired' : 'is-warning' %>" style="margin-bottom:14px;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                    <span>
+                        <% if (planExpiryDaysLeft < 0) { %>
+                            Este treino venceu <%= Math.abs(planExpiryDaysLeft) %> dia<%= Math.abs(planExpiryDaysLeft) === 1 ? '' : 's' %> atrás. Peça um novo treino ao seu instrutor.
+                        <% } else if (planExpiryDaysLeft === 0) { %>
+                            Este treino vence hoje. Fale com seu instrutor para receber um novo.
+                        <% } else { %>
+                            Este treino vence em <%= planExpiryDaysLeft %> dia<%= planExpiryDaysLeft === 1 ? '' : 's' %>. Combine com seu instrutor a atualização.
+                        <% } %>
+                    </span>
+                </div>
+            <% } %>
+
             <% if (plan.groups.length > 0) { %>
                 <div class="workouts-grid" style="margin-bottom: 28px;">
                     <% plan.groups.forEach(group => { %>
-                        <div class="workout-card">
+                        <div class="workout-card <%= group.activeSessionId ? 'is-active' : '' %>">
                             <div class="card-header">
                                 <div class="section-card-title">
                                     <span class="section-icon-badge">
@@ -50,34 +93,41 @@
                                         <span class="stat-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg></span>
                                         <span><%= group.sessions.length %> treinos</span>
                                     </div>
+                                    <div class="stat">
+                                        <span class="stat-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg></span>
+                                        <span><%= group.totalSets %> séries</span>
+                                    </div>
                                 </div>
 
-                                <!-- Exercise List -->
-                                <% if (group.exercises.length > 0) { %>
-                                    <div class="exercises-preview">
-                                        <% group.exercises.slice(0, 5).forEach(ex => { %>
-                                            <div class="exercise-preview">
-                                                <span><%= ex.name %></span>
-                                                <span class="sets-reps"><%= ex.sets %>x<%= ex.reps %></span>
-                                            </div>
-                                        <% }); %>
-                                        <% if (group.exercises.length > 5) { %>
-                                            <div class="more-exercises">+<%= group.exercises.length - 5 %> mais</div>
-                                        <% } %>
-                                    </div>
-                                <% } else { %>
+                                <% if (group.exercises.length === 0) { %>
                                     <p class="section-hint">Nenhum exercício cadastrado neste grupo.</p>
                                 <% } %>
                             </div>
 
                             <div class="card-footer">
-                                <form method="POST" action="/workouts/groups/<%= group.id %>/start" style="display: inline; width: 100%;">
-                                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-                                    <button type="submit" class="btn btn-primary btn-lg" style="width: 100%; justify-content: center;">
+                                <button
+                                    type="button"
+                                    class="btn btn-secondary btn-lg"
+                                    style="flex: 1; justify-content: center;"
+                                    data-group="<%- JSON.stringify({ groupName: group.name, planName: plan.name, exercises: group.exercises }).replace(/"/g, '&quot;') %>"
+                                    onclick="openExercisePreview(this)">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>
+                                    Ver Exercícios
+                                </button>
+                                <% if (group.activeSessionId) { %>
+                                    <a href="/workouts/session/<%= group.activeSessionId %>" class="btn btn-primary btn-lg" style="flex: 1; justify-content: center;">
                                         <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-                                        Iniciar Treino
-                                    </button>
-                                </form>
+                                        Continuar Treino
+                                    </a>
+                                <% } else { %>
+                                    <form method="POST" action="/workouts/groups/<%= group.id %>/start" style="display: flex; flex: 1;">
+                                        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                                        <button type="submit" class="btn btn-primary btn-lg" style="width: 100%; justify-content: center;">
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                                            Iniciar Treino
+                                        </button>
+                                    </form>
+                                <% } %>
                             </div>
                         </div>
                     <% }); %>
@@ -105,4 +155,140 @@
         </span>
         <svg class="admin-action-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
     </a>
+
+    <!-- Exercise Preview Modal (read-only, no session created) -->
+    <div id="exercisePreviewModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:9999;padding:24px;align-items:center;justify-content:center;">
+        <div style="background:var(--bg-secondary);border:1px solid var(--border-default);border-radius:14px;max-width:640px;width:100%;max-height:85vh;overflow-y:auto;padding:20px;">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:4px;">
+                <div>
+                    <h3 id="exercisePreviewGroupName" style="margin:0;">-</h3>
+                    <p id="exercisePreviewPlanName" style="margin:2px 0 0;color:var(--text-secondary);font-size:13px;"></p>
+                </div>
+                <button type="button" id="closeExercisePreviewModal" class="btn btn-secondary btn-sm">Fechar</button>
+            </div>
+            <div id="exercisePreviewList" class="exercises-list" style="margin-top:14px;"></div>
+        </div>
+    </div>
+
+    <!-- Exercise Preview - Image Gallery -->
+    <div id="exercisePreviewImageModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:10000;padding:24px;align-items:center;justify-content:center;">
+        <div style="position:relative;max-width:900px;width:100%;max-height:100%;display:flex;flex-direction:column;gap:12px;">
+            <button type="button" id="closeExercisePreviewImageModal" class="btn btn-secondary btn-sm" style="align-self:flex-end;">Fechar</button>
+            <div style="background:#111;border-radius:14px;padding:12px;display:flex;align-items:center;justify-content:center;min-height:240px;">
+                <img id="exercisePreviewImagePreview" src="" alt="Imagem do exercício" style="max-width:100%;max-height:65vh;border-radius:10px;object-fit:contain;display:none;">
+            </div>
+            <div id="exercisePreviewImageThumbs" style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;"></div>
+        </div>
+    </div>
 </div>
+
+<script nonce="<%= nonce %>">
+    const exercisePreviewModal = document.getElementById('exercisePreviewModal');
+    const exercisePreviewList = document.getElementById('exercisePreviewList');
+
+    function openExercisePreview(btn) {
+        const data = JSON.parse(btn.dataset.group || '{}');
+        document.getElementById('exercisePreviewGroupName').textContent = data.groupName || '';
+        document.getElementById('exercisePreviewPlanName').textContent = data.planName || '';
+
+        const exercises = Array.isArray(data.exercises) ? data.exercises : [];
+        exercisePreviewList.innerHTML = exercises.length
+            ? exercises.map((ex, index) => renderExercisePreviewItem(ex, index)).join('')
+            : '<p class="section-hint">Nenhum exercício cadastrado neste grupo.</p>';
+
+        exercisePreviewList.querySelectorAll('.btn-open-preview-images').forEach((button) => {
+            button.addEventListener('click', () => {
+                const images = JSON.parse(button.dataset.images || '[]');
+                openExercisePreviewImages(images);
+            });
+        });
+
+        exercisePreviewModal.style.display = 'flex';
+    }
+
+    function renderExercisePreviewItem(ex, index) {
+        const hasImages = Array.isArray(ex.images) && ex.images.length > 0;
+        return `
+            <div class="exercise-item">
+                <div class="exercise-header">
+                    <div class="exercise-number"><span class="number">${index + 1}</span></div>
+                    <div class="exercise-info">
+                        <h3>${escapeHtml(ex.name)}</h3>
+                        <div class="exercise-meta">
+                            <span class="meta-item"><strong>${escapeHtml(SetsReps.format(ex.sets, ex.reps))}</strong></span>
+                            ${ex.weight ? `<span class="meta-item"><strong>${escapeHtml(ex.weight)}</strong></span>` : ''}
+                            ${ex.restSeconds ? `<span class="meta-item" style="display:inline-flex;align-items:center;gap:4px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>${ex.restSeconds}s descanso</span>` : ''}
+                        </div>
+                        ${ex.notes ? `<p class="exercise-notes">${escapeHtml(ex.notes)}</p>` : ''}
+                        ${hasImages ? `
+                            <div class="exercise-media-actions" style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
+                                <button type="button" class="btn btn-secondary btn-sm btn-open-preview-images" data-images='${JSON.stringify(ex.images).replace(/'/g, '&#39;')}' style="display:inline-flex;align-items:center;gap:6px;">
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                                    Ver foto${ex.images.length > 1 ? 's' : ''}
+                                </button>
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    function escapeHtml(value) {
+        return String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+
+    document.getElementById('closeExercisePreviewModal').addEventListener('click', () => {
+        exercisePreviewModal.style.display = 'none';
+    });
+    exercisePreviewModal.addEventListener('click', (event) => {
+        if (event.target === exercisePreviewModal) exercisePreviewModal.style.display = 'none';
+    });
+
+    const exercisePreviewImageModal = document.getElementById('exercisePreviewImageModal');
+    const exercisePreviewImagePreview = document.getElementById('exercisePreviewImagePreview');
+    const exercisePreviewImageThumbs = document.getElementById('exercisePreviewImageThumbs');
+
+    function openExercisePreviewImages(images) {
+        if (!Array.isArray(images) || images.length === 0) return;
+        exercisePreviewImageModal.style.display = 'flex';
+        renderExercisePreviewGallery(images, 0);
+    }
+
+    function renderExercisePreviewGallery(images, activeIndex) {
+        const current = images[activeIndex];
+        if (!current) return;
+
+        exercisePreviewImagePreview.src = current.publicUrl;
+        exercisePreviewImagePreview.alt = current.fileName || 'Imagem do exercício';
+        exercisePreviewImagePreview.style.display = 'block';
+
+        exercisePreviewImageThumbs.innerHTML = images.map((image, index) => {
+            const activeStyle = index === activeIndex
+                ? 'border:2px solid var(--accent-primary);opacity:1;'
+                : 'border:2px solid transparent;opacity:.75;';
+            return `<button type="button" class="btn-thumb-preview-image" data-index="${index}" style="padding:0;border-radius:8px;overflow:hidden;background:transparent;${activeStyle}">
+                <img src="${image.publicUrl}" alt="${escapeHtml(image.fileName || 'Imagem')}" style="width:72px;height:72px;object-fit:cover;display:block;">
+            </button>`;
+        }).join('');
+
+        exercisePreviewImageThumbs.querySelectorAll('.btn-thumb-preview-image').forEach((button) => {
+            button.addEventListener('click', () => {
+                renderExercisePreviewGallery(images, Number(button.dataset.index));
+            });
+        });
+    }
+
+    document.getElementById('closeExercisePreviewImageModal').addEventListener('click', () => {
+        exercisePreviewImageModal.style.display = 'none';
+        exercisePreviewImagePreview.src = '';
+        exercisePreviewImageThumbs.innerHTML = '';
+    });
+    exercisePreviewImageModal.addEventListener('click', (event) => {
+        if (event.target === exercisePreviewImageModal) {
+            exercisePreviewImageModal.style.display = 'none';
+            exercisePreviewImagePreview.src = '';
+            exercisePreviewImageThumbs.innerHTML = '';
+        }
+    });
+</script>

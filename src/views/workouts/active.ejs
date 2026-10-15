@@ -32,7 +32,7 @@
                         <h3><%= sessionExercise.exercise.name %></h3>
                         <div class="exercise-meta">
                             <span class="meta-item">
-                                <strong><%= sessionExercise.exercise.sets %>x<%= sessionExercise.exercise.reps %></strong>
+                                <strong><%= formatSetsReps(sessionExercise.exercise.sets, sessionExercise.exercise.reps) %></strong>
                             </span>
                             <% if (sessionExercise.exercise.weight) { %>
                                 <span class="meta-item">
@@ -46,8 +46,16 @@
                                 </span>
                             <% } %>
                         </div>
+                        <% if (sessionExercise.lastWeight || sessionExercise.lastReps) { %>
+                            <p class="exercise-last-used">
+                                Último: <strong><%= [sessionExercise.lastWeight, sessionExercise.lastReps].filter(Boolean).join(' · ') %></strong>
+                            </p>
+                        <% } %>
                         <% if (sessionExercise.exercise.notes) { %>
                             <p class="exercise-notes"><%= sessionExercise.exercise.notes %></p>
+                        <% } %>
+                        <% if (sessionExercise.actualWeight || sessionExercise.actualReps) { %>
+                            <p class="exercise-load-done"><%= [sessionExercise.actualWeight, sessionExercise.actualReps].filter(Boolean).join(' · ') %></p>
                         <% } %>
                         <% if (sessionExercise.exercise.images && sessionExercise.exercise.images.length > 0) { %>
                             <div class="exercise-media-actions" style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
@@ -62,7 +70,9 @@
                             </div>
                         <% } %>
                     </div>
-                    <button class="btn-complete" data-session-id="<%= session.id %>" data-exercise-id="<%= sessionExercise.id %>">
+                    <button class="btn-complete" data-session-id="<%= session.id %>" data-exercise-id="<%= sessionExercise.id %>"
+                            data-last-weight="<%= sessionExercise.actualWeight || sessionExercise.lastWeight || '' %>"
+                            data-last-reps="<%= sessionExercise.actualReps || sessionExercise.lastReps || '' %>">
                         <span class="check-icon"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></span>
                         <span class="check-text">Concluído</span>
                     </button>
@@ -72,11 +82,31 @@
     </div>
 
     <!-- Complete Workout Button -->
-    <div class="complete-section" style="display: none;" id="completeSection">
-        <button id="completeWorkoutBtn" class="btn btn-success btn-lg">
+    <div class="complete-section" id="completeSection">
+        <label class="feedback-label" for="workoutFeedback">Como foi o treino? (opcional)</label>
+        <textarea id="workoutFeedback" class="feedback-textarea" rows="2" placeholder="Ex: senti bem cansado nas pernas hoje..."></textarea>
+        <button id="completeWorkoutBtn" class="btn btn-primary btn-lg">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
             Finalizar Treino
         </button>
+    </div>
+
+    <div id="loadModal" class="load-modal-backdrop" style="display:none;">
+        <div class="load-modal-card">
+            <h3 id="loadModalExerciseName">Registrar treino</h3>
+            <div class="load-modal-field">
+                <label for="loadModalWeight">Carga</label>
+                <input type="text" id="loadModalWeight" placeholder="ex: 20kg">
+            </div>
+            <div class="load-modal-field">
+                <label for="loadModalReps">Repetições</label>
+                <input type="text" id="loadModalReps" placeholder="ex: 12,10,8">
+            </div>
+            <div class="load-modal-actions">
+                <button type="button" id="loadModalSkip" class="btn btn-secondary btn-sm">Pular</button>
+                <button type="button" id="loadModalConfirm" class="btn btn-primary btn-sm">Confirmar</button>
+            </div>
+        </div>
     </div>
 
     <div id="exerciseImageModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:9999;padding:24px;align-items:center;justify-content:center;">
@@ -95,14 +125,45 @@
     const csrfToken = '<%= csrfToken %>';
     const totalExercises = <%= totalCount %>;
     let completedCount = <%= completedCount %>;
+    const sessionStartedAt = '<%= session.startedAt %>';
+
+    const loadModal = document.getElementById('loadModal');
+    const loadModalExerciseName = document.getElementById('loadModalExerciseName');
+    const loadModalWeight = document.getElementById('loadModalWeight');
+    const loadModalReps = document.getElementById('loadModalReps');
+    let pendingExercise = null;
+
+    function openLoadModal(btn, exerciseName) {
+        pendingExercise = btn;
+        loadModalExerciseName.textContent = exerciseName;
+        loadModalWeight.value = btn.dataset.lastWeight || '';
+        loadModalReps.value = btn.dataset.lastReps || '';
+        loadModal.style.display = 'flex';
+        loadModalWeight.focus();
+    }
+
+    function closeLoadModal() {
+        loadModal.style.display = 'none';
+        pendingExercise = null;
+    }
+
+    document.getElementById('loadModalSkip').addEventListener('click', () => {
+        if (pendingExercise) submitExerciseComplete(pendingExercise, null, null);
+        closeLoadModal();
+    });
+
+    document.getElementById('loadModalConfirm').addEventListener('click', () => {
+        if (pendingExercise) submitExerciseComplete(pendingExercise, loadModalWeight.value.trim() || null, loadModalReps.value.trim() || null);
+        closeLoadModal();
+    });
+
+    loadModal.addEventListener('click', (event) => {
+        if (event.target === loadModal) closeLoadModal();
+    });
+
     const imageModal = document.getElementById('exerciseImageModal');
     const imageModalPreview = document.getElementById('exerciseImageModalPreview');
     const imageModalThumbs = document.getElementById('exerciseImageModalThumbs');
-
-    // Show complete button if already all done on load
-    if (completedCount === totalExercises && totalExercises > 0) {
-        document.getElementById('completeSection').style.display = 'block';
-    }
 
     // Complete Exercise
     document.querySelectorAll('.btn-complete').forEach(btn => {
@@ -112,60 +173,67 @@
             btn.disabled = true;
         }
 
-        btn.addEventListener('click', async function() {
-            const sessionId = this.dataset.sessionId;
-            const exerciseId = this.dataset.exerciseId;
-            const exerciseItem = document.querySelector(`[data-exercise-id="${exerciseId}"]`);
-
-            try {
-                this.disabled = true;
-
-                const response = await fetch(`/workouts/session/${sessionId}/exercise/${exerciseId}/complete`, {
-                    method: 'PATCH',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-Token': csrfToken
-                    }
-                });
-
-                if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
-                const data = await response.json();
-
-                if (data.success) {
-                    exerciseItem.classList.add('completed');
-                    completedCount++;
-                    document.getElementById('progressText').textContent = `${completedCount}/${totalExercises} exercícios`;
-                    document.getElementById('progressPercent').textContent = `${Math.round((completedCount / totalExercises) * 100)}%`;
-                    document.getElementById('progressFill').style.width = `${(completedCount / totalExercises) * 100}%`;
-
-                    // Auto-finish when all exercises done
-                    if (completedCount === totalExercises) {
-                        showToast('Todos os exercícios concluídos! Finalizando treino...', 'success');
-                        await finishWorkout();
-                    } else {
-                        showToast('Exercício concluído!', 'success');
-                    }
-                } else {
-                    throw new Error(data.message || 'Erro desconhecido');
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                showToast('Erro: ' + error.message, 'error');
-                this.disabled = false;
-            }
+        btn.addEventListener('click', function() {
+            const exerciseItem = document.querySelector(`[data-exercise-id="${this.dataset.exerciseId}"]`);
+            const exerciseName = exerciseItem?.querySelector('.exercise-info h3')?.textContent || 'Exercício';
+            openLoadModal(this, exerciseName);
         });
     });
 
+    async function submitExerciseComplete(btn, actualWeight, actualReps) {
+        const sessionId = btn.dataset.sessionId;
+        const exerciseId = btn.dataset.exerciseId;
+        const exerciseItem = document.querySelector(`[data-exercise-id="${exerciseId}"]`);
+
+        try {
+            btn.disabled = true;
+
+            const response = await fetch(`/workouts/session/${sessionId}/exercise/${exerciseId}/complete`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': csrfToken
+                },
+                body: JSON.stringify({ actualWeight, actualReps })
+            });
+
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+            const data = await response.json();
+
+            if (data.success) {
+                exerciseItem.classList.add('completed');
+                completedCount++;
+                document.getElementById('progressText').textContent = `${completedCount}/${totalExercises} exercícios`;
+                document.getElementById('progressPercent').textContent = `${Math.round((completedCount / totalExercises) * 100)}%`;
+                document.getElementById('progressFill').style.width = `${(completedCount / totalExercises) * 100}%`;
+
+                if (completedCount === totalExercises) {
+                    document.getElementById('completeSection').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                } else {
+                    showToast('Exercício concluído!', 'success');
+                }
+            } else {
+                throw new Error(data.message || 'Erro desconhecido');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            showToast('Erro: ' + error.message, 'error');
+            btn.disabled = false;
+        }
+    }
+
     async function finishWorkout() {
         try {
+            const durationMin = Math.max(1, Math.round((Date.now() - new Date(sessionStartedAt).getTime()) / 60000));
+            const notes = document.getElementById('workoutFeedback')?.value.trim() || null;
             const response = await fetch(`/workouts/session/${sessionId}/complete`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'X-CSRF-Token': csrfToken
                 },
-                body: JSON.stringify({ durationMin: 0 })
+                body: JSON.stringify({ durationMin, notes })
             });
 
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -180,13 +248,18 @@
         } catch (error) {
             console.error('Error:', error);
             showToast('Erro ao finalizar: ' + error.message, 'error');
-            // Show manual button as fallback
-            document.getElementById('completeSection').style.display = 'block';
+            document.getElementById('completeWorkoutBtn').disabled = false;
         }
     }
 
-    // Manual complete button (fallback)
+    // Pode finalizar a qualquer momento; se faltar exercício, pede confirmação
     document.getElementById('completeWorkoutBtn')?.addEventListener('click', async function() {
+        const pending = totalExercises - completedCount;
+        if (pending > 0) {
+            const msg = `Você concluiu ${completedCount} de ${totalExercises} exercícios. ` +
+                `${pending === 1 ? 'O exercício restante ficará marcado' : `Os ${pending} restantes ficarão marcados`} como não feito. Finalizar mesmo assim?`;
+            if (!(await askConfirm(msg, 'Finalizar treino'))) return;
+        }
         this.disabled = true;
         await finishWorkout();
     });
@@ -212,7 +285,7 @@
 
         imageModalThumbs.innerHTML = images.map((image, index) => {
             const activeStyle = index === activeIndex
-                ? 'border:2px solid #ff6b00;opacity:1;'
+                ? 'border:2px solid var(--accent-primary);opacity:1;'
                 : 'border:2px solid transparent;opacity:.75;';
 
             return `<button type="button" class="btn-thumb-image" data-index="${index}" style="padding:0;border-radius:8px;overflow:hidden;background:transparent;${activeStyle}">

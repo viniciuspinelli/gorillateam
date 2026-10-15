@@ -17,13 +17,24 @@ const dietRoutes = require('./src/routes/diet');
 const shoppingRoutes = require('./src/routes/shopping');
 const adminRoutes = require('./src/routes/admin');
 const profileRoutes = require('./src/routes/profile');
+const bodyRoutes = require('./src/routes/body');
 const authMiddleware = require('./src/middleware/authMiddleware');
 const adminMiddleware = require('./src/middleware/adminMiddleware');
 const { mountStorageStatic } = require('./src/services/storage');
 const apiRoutes = require('./src/routes/api');
+const fs = require('fs');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Cache-busting query param for static CSS, based on the file's own mtime,
+// so a deploy invalidates browsers' cached style.css without manual versioning.
+try {
+  app.locals.cssVersion = fs.statSync(path.join(__dirname, 'src', 'public', 'css', 'style.css')).mtimeMs;
+} catch {
+  app.locals.cssVersion = Date.now();
+}
+app.locals.formatSetsReps = require('./src/public/js/setsReps').format;
 
 // Trust proxy — Render termina TLS no balanceador (1 hop)
 app.set('trust proxy', 1);
@@ -116,6 +127,12 @@ app.use(express.json());
 // Static files
 app.use(express.static(path.join(__dirname, 'src', 'public')));
 mountStorageStatic(app);
+
+// Serve Chart.js's UMD build ourselves (used by the weight-evolution graph) so
+// the strict script-src 'self' CSP doesn't need a CDN exception.
+app.get('/vendor/chart.min.js', (req, res) => {
+  res.sendFile(path.join(__dirname, 'node_modules', 'chart.js', 'dist', 'chart.umd.min.js'));
+});
 
 // Falha imediata se SESSION_SECRET não estiver definida em produção
 if (process.env.NODE_ENV === 'production' && !process.env.SESSION_SECRET) {
@@ -294,7 +311,7 @@ app.get('/', async (req, res) => {
     // Show landing page for visitors
     res.render('landing', {
       layout: 'layouts/landing',
-      title: 'GymDiet — Treinos e Dieta',
+      title: 'Mais que atletas, uma família',
     });
   } catch (err) {
     console.error('Erro ao verificar usuários:', err);
@@ -308,6 +325,10 @@ app.use('/diet', authMiddleware, dietRoutes);
 app.use('/shopping', authMiddleware, shoppingRoutes);
 app.use('/admin', authMiddleware, adminMiddleware, adminRoutes);
 app.use('/profile', authMiddleware, profileRoutes);
+app.use('/body', authMiddleware, bodyRoutes);
+app.get('/design-test', authMiddleware, (req, res) => {
+  res.render('design-test', { layout: false });
+});
 
 // ========================
 // ERROR HANDLING
@@ -327,6 +348,20 @@ app.use((err, req, res, next) => {
   // Allow CSRF errors for setup routes (they don't require CSRF token)
   if (err.code === 'EBADCSRFTOKEN' && req.path.startsWith('/setup')) {
     return next();
+  }
+
+  // A bad CSRF token on the auth forms usually means the login/register POST
+  // was submitted twice (e.g. a double tap on mobile): session.regenerate()
+  // on the first request invalidates the token embedded in the page before
+  // the second request is validated. Rather than showing a raw 403 page,
+  // recover gracefully: if the user actually ended up logged in (the other
+  // request won the race), send them home; otherwise bounce back to a fresh
+  // copy of the form so they can just retry.
+  if (err.code === 'EBADCSRFTOKEN' && req.path.startsWith('/auth/')) {
+    if (req.session && req.session.user) {
+      return res.redirect('/workouts');
+    }
+    return res.redirect(req.path);
   }
 
   if (err.name === 'MulterError' || /Formato de imagem não suportado/.test(err.message || '')) {
@@ -406,6 +441,7 @@ async function initializeDatabase() {
         "order" INTEGER DEFAULT 0,
         "isActive" BOOLEAN DEFAULT true,
         "isTemplate" BOOLEAN DEFAULT false,
+        "expiresAt" TIMESTAMP,
         "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
@@ -418,6 +454,10 @@ async function initializeDatabase() {
 
     // Migration: add isTemplate column to WorkoutPlan (MealPlan migration runs after MealPlan exists)
     await client.query(`ALTER TABLE IF EXISTS "WorkoutPlan" ADD COLUMN IF NOT EXISTS "isTemplate" BOOLEAN DEFAULT false;`);
+
+    // Migration: add expiresAt column, so an assigned workout can carry a validity
+    // date after which the student is expected to ask their instructor for a new plan.
+    await client.query(`ALTER TABLE IF EXISTS "WorkoutPlan" ADD COLUMN IF NOT EXISTS "expiresAt" TIMESTAMP;`);
 
     // Migration: add role column to User
     await client.query(`ALTER TABLE "User" ADD COLUMN IF NOT EXISTS role VARCHAR(20) DEFAULT 'user';`);
@@ -504,6 +544,8 @@ async function initializeDatabase() {
 
     await client.query(`ALTER TABLE "Exercise" ADD COLUMN IF NOT EXISTS "workoutGroupId" INTEGER REFERENCES "WorkoutGroup"(id) ON DELETE CASCADE;`);
     await client.query(`ALTER TABLE "WorkoutSession" ADD COLUMN IF NOT EXISTS "workoutGroupId" INTEGER REFERENCES "WorkoutGroup"(id) ON DELETE SET NULL;`);
+    // reps guarda uma lista por série quando o exercício mistura repetições (ex: "20 / 8 / 8")
+    await client.query(`ALTER TABLE "Exercise" ALTER COLUMN reps TYPE VARCHAR(200);`);
 
     // Backfill: every pre-existing WorkoutPlan gets one default group holding its
     // existing exercises/sessions, so nothing created before this feature breaks.
@@ -616,6 +658,59 @@ async function initializeDatabase() {
         "order" INTEGER DEFAULT 0
       );
     `);
+
+    // Expo push tokens for the mobile app — one row per device, so a user can be
+    // signed in on multiple phones and still receive pushes on all of them.
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS "PushToken" (
+        id SERIAL PRIMARY KEY,
+        "userId" INTEGER NOT NULL REFERENCES "User"(id) ON DELETE CASCADE,
+        token VARCHAR(255) NOT NULL UNIQUE,
+        platform VARCHAR(20),
+        "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // Instructor's reply to a student's workout feedback
+    await client.query(`
+      ALTER TABLE "WorkoutSession"
+        ADD COLUMN IF NOT EXISTS "instructorReply" TEXT,
+        ADD COLUMN IF NOT EXISTS "instructorReplyAt" TIMESTAMP
+    `);
+
+    // Body weight log ("Minha Evolução") — one entry per user per day; logging
+    // again on the same day updates it instead of creating a duplicate point.
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS "BodyWeightLog" (
+        id SERIAL PRIMARY KEY,
+        "userId" INTEGER NOT NULL REFERENCES "User"(id) ON DELETE CASCADE,
+        weight DECIMAL(5, 2) NOT NULL,
+        "recordedAt" DATE NOT NULL DEFAULT CURRENT_DATE,
+        "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE ("userId", "recordedAt")
+      );
+    `);
+
+    // Progress photos the student uploads periodically (as requested by their
+    // instructor) — mirrors WorkoutExerciseImage's storage-provider pattern.
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS "ProgressPhoto" (
+        id SERIAL PRIMARY KEY,
+        "userId" INTEGER NOT NULL REFERENCES "User"(id) ON DELETE CASCADE,
+        "storageProvider" VARCHAR(50) NOT NULL DEFAULT 'local',
+        "storageKey" TEXT NOT NULL,
+        "publicUrl" TEXT NOT NULL,
+        "fileName" VARCHAR(255),
+        "mimeType" VARCHAR(100) NOT NULL,
+        "sizeBytes" INTEGER,
+        "takenAt" DATE NOT NULL DEFAULT CURRENT_DATE,
+        "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    await client.query(
+      'CREATE INDEX IF NOT EXISTS "ProgressPhoto_userId_idx" ON "ProgressPhoto" ("userId");'
+    );
 
     console.log('✅ Tabelas criadas/verificadas com sucesso!');
   } catch (err) {
@@ -863,7 +958,7 @@ async function start() {
     await initializeDatabase();
     
     app.listen(PORT, () => {
-      console.log(`🚀 GymDiet app running on http://localhost:${PORT}`);
+      console.log(`🚀 Gorilla.Team app running on http://localhost:${PORT}`);
       console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
     });
   } catch (error) {

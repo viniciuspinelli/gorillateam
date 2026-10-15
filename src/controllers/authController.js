@@ -355,12 +355,12 @@ exports.postForgotPassword = async (req, res, next) => {
 
     const transporter = createMailTransporter();
     await transporter.sendMail({
-      from: `"GymDiet" <${process.env.SMTP_USER}>`,
+      from: `"Gorilla.Team" <${process.env.SMTP_USER}>`,
       to: user.email,
-      subject: 'Redefinição de Senha — GymDiet',
+      subject: 'Redefinição de Senha — Gorilla.Team',
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 520px; margin: auto; background: #1a1a2e; color: #e0e0e0; padding: 32px; border-radius: 12px;">
-          <h2 style="color: #ff6b35; margin-bottom: 8px;">GymDiet</h2>
+          <h2 style="color: #F24A00; margin-bottom: 8px;">GORILLA.TEAM</h2>
           <p>Olá, <strong>${user.username}</strong>!</p>
           <p>Recebemos uma solicitação para redefinir a sua senha. Clique no botão abaixo para criar uma nova senha:</p>
           <div style="text-align: center; margin: 32px 0;">

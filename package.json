@@ -21,6 +21,7 @@
   "license": "MIT",
   "dependencies": {
     "bcrypt": "^5.1.1",
+    "chart.js": "^4.5.1",
     "connect-pg-simple": "^9.0.0",
     "csurf": "^1.11.0",
     "dotenv": "^16.3.0",
@@ -38,6 +39,8 @@
     "pg": "^8.11.0"
   },
   "devDependencies": {
-    "nodemon": "^3.0.0"
+    "nodemon": "^3.0.0",
+    "@modelcontextprotocol/server-postgres": "^0.6.2",
+    "@playwright/mcp": "^0.0.82"
   }
 }

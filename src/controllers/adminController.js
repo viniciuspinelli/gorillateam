@@ -1,5 +1,14 @@
 const bcrypt = require('bcrypt');
 const crypto = require('crypto');
+const { sendPushToUser } = require('../services/pushNotifications');
+
+// pg returns DATE columns as JS Date objects (UTC midnight); the views build
+// display dates by string-concatenating a local-time suffix onto this field,
+// which only works against a plain "YYYY-MM-DD" string. toISOString().slice
+// pulls that string back out without a local-timezone day-shift.
+function toDateString(date) {
+  return date.toISOString().slice(0, 10);
+}
 
 function getAppUrl(req) {
   return process.env.APP_URL || `${req.protocol}://${req.get('host')}`;
@@ -67,7 +76,7 @@ exports.getUsers = async (req, res, next) => {
         )
       : await global.db.query(
           `SELECT id, username, "fullName", role, "createdAt" FROM "User"
-           WHERE "instructorId" = $1
+           WHERE "instructorId" = $1 OR id = $1
            ORDER BY "createdAt" DESC`,
           [currentUserId]
         );
@@ -316,12 +325,12 @@ exports.getUserDetail = async (req, res, next) => {
     if (!userResult.rows[0]) return res.redirect('/admin/users');
     const targetUser = userResult.rows[0];
     // Instructor can only view their own students
-    if (!isAdmin && targetUser.instructorId !== currentUserId) {
+    if (!isAdmin && targetUser.instructorId !== currentUserId && targetUser.id !== currentUserId) {
       return res.redirect('/admin/users');
     }
 
     const workoutsResult = await global.db.query(
-      `SELECT id, name, "isActive", "dayOfWeek" FROM "WorkoutPlan" WHERE "userId" = $1 AND "isTemplate" = false ORDER BY "order" ASC`,
+      `SELECT id, name, "isActive", "dayOfWeek", "expiresAt" FROM "WorkoutPlan" WHERE "userId" = $1 AND "isTemplate" = false ORDER BY "order" ASC`,
       [userId]
     );
     const dietsResult = await global.db.query(
@@ -344,6 +353,71 @@ exports.getUserDetail = async (req, res, next) => {
       diets: dietsResult.rows,
       workoutTemplates: workoutTemplatesResult.rows,
       dietTemplates: dietTemplatesResult.rows,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.getUserEvolution = async (req, res, next) => {
+  try {
+    const userId = parseInt(req.params.id);
+    const isAdmin = req.session.user.role === 'admin';
+    const currentUserId = req.session.user.id;
+    const userResult = await global.db.query(`SELECT id, username, "fullName", role, "instructorId" FROM "User" WHERE id = $1`, [userId]);
+    if (!userResult.rows[0]) return res.redirect('/admin/users');
+    const targetUser = userResult.rows[0];
+    if (!isAdmin && targetUser.instructorId !== currentUserId && targetUser.id !== currentUserId) {
+      return res.redirect('/admin/users');
+    }
+
+    const sessionsResult = await global.db.query(
+      `SELECT ws.id, ws."completedAt", ws."durationMin", ws."notes", ws."instructorReply", ws."instructorReplyAt",
+              wp.name as plan_name, wg.name as group_name
+       FROM "WorkoutSession" ws
+       JOIN "WorkoutPlan" wp ON ws."workoutPlanId" = wp.id
+       LEFT JOIN "WorkoutGroup" wg ON ws."workoutGroupId" = wg.id
+       WHERE ws."userId" = $1 AND ws."isCompleted" = true
+       ORDER BY ws."completedAt" DESC
+       LIMIT 20`,
+      [userId]
+    );
+    const workoutSessions = await Promise.all(sessionsResult.rows.map(async (row) => {
+      const exercisesResult = await global.db.query(
+        `SELECT se.id, se."actualWeight", se."actualReps", e.name, e.sets, e.reps
+         FROM "SessionExercise" se JOIN "Exercise" e ON se."exerciseId" = e.id
+         WHERE se."workoutSessionId" = $1 ORDER BY e."order" ASC`,
+        [row.id]
+      );
+      return {
+        id: row.id,
+        completedAt: row.completedAt,
+        durationMin: row.durationMin,
+        notes: row.notes,
+        instructorReply: row.instructorReply,
+        instructorReplyAt: row.instructorReplyAt,
+        planName: row.plan_name,
+        groupName: row.group_name,
+        sessionExercises: exercisesResult.rows,
+      };
+    }));
+
+    const weightResult = await global.db.query(
+      `SELECT id, weight, "recordedAt" FROM "BodyWeightLog" WHERE "userId" = $1 ORDER BY "recordedAt" ASC`,
+      [userId]
+    );
+    const photosResult = await global.db.query(
+      `SELECT id, "publicUrl", "fileName", "takenAt" FROM "ProgressPhoto" WHERE "userId" = $1 ORDER BY "takenAt" DESC, id DESC`,
+      [userId]
+    );
+
+    res.render('admin/user-evolution', {
+      title: `Evolução: ${targetUser.username}`,
+      csrfToken: req.csrfToken(),
+      targetUser,
+      workoutSessions,
+      weightLogs: weightResult.rows.map((row) => ({ ...row, recordedAt: toDateString(row.recordedAt) })),
+      photos: photosResult.rows.map((row) => ({ ...row, takenAt: toDateString(row.takenAt) })),
     });
   } catch (err) {
     next(err);
@@ -531,14 +605,20 @@ exports.deleteDietTemplate = async (req, res, next) => {
 exports.assignWorkout = async (req, res, next) => {
   const client = await global.db.connect();
   try {
-    const { templateId } = req.body;
+    const { templateId, expiresAt } = req.body;
     const userId = parseInt(req.params.id);
+
+    let expirationDate = expiresAt ? new Date(expiresAt) : null;
+    if (!expirationDate || isNaN(expirationDate.getTime())) {
+      expirationDate = new Date();
+      expirationDate.setMonth(expirationDate.getMonth() + 3);
+    }
     const isAdmin = req.session.user.role === 'admin';
     const currentUserId = req.session.user.id;
 
     if (!isAdmin) {
       const studentCheck = await client.query(`SELECT "instructorId" FROM "User" WHERE id = $1`, [userId]);
-      if (!studentCheck.rows[0] || studentCheck.rows[0].instructorId !== currentUserId) {
+      if (!studentCheck.rows[0] || (studentCheck.rows[0].instructorId !== currentUserId && userId !== currentUserId)) {
         return res.status(403).json({ success: false, message: 'Acesso negado' });
       }
     }
@@ -567,9 +647,9 @@ exports.assignWorkout = async (req, res, next) => {
 
     // Deep copy the workout plan for the user
     const newPlanResult = await client.query(
-      `INSERT INTO "WorkoutPlan" (name, description, "dayOfWeek", "order", "isActive", "isTemplate", "userId")
-       VALUES ($1, $2, $3, $4, true, false, $5) RETURNING id`,
-      [template.name, template.description, template.dayOfWeek, template.order, userId]
+      `INSERT INTO "WorkoutPlan" (name, description, "dayOfWeek", "order", "isActive", "isTemplate", "userId", "expiresAt")
+       VALUES ($1, $2, $3, $4, true, false, $5, $6) RETURNING id`,
+      [template.name, template.description, template.dayOfWeek, template.order, userId, expirationDate]
     );
     const newPlanId = newPlanResult.rows[0].id;
 
@@ -591,15 +671,27 @@ exports.assignWorkout = async (req, res, next) => {
         [group.id]
       );
       for (const ex of exercises.rows) {
-        await client.query(
+        const newExerciseResult = await client.query(
           `INSERT INTO "Exercise" ("workoutPlanId", "workoutGroupId", name, sets, reps, weight, "restSeconds", notes, "order")
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
           [newPlanId, newGroupId, ex.name, ex.sets, ex.reps, ex.weight, ex.restSeconds, ex.notes, ex.order]
+        );
+        const newExerciseId = newExerciseResult.rows[0].id;
+
+        // Carry over the exercise's reference photos, since they live on the
+        // template's exercise row and would otherwise be orphaned for the student.
+        await client.query(
+          `INSERT INTO "WorkoutExerciseImage"
+             ("exerciseId", "createdBy", "storageProvider", "storageKey", "publicUrl", "fileName", "mimeType", "sizeBytes", "sortOrder")
+           SELECT $1, "createdBy", "storageProvider", "storageKey", "publicUrl", "fileName", "mimeType", "sizeBytes", "sortOrder"
+           FROM "WorkoutExerciseImage" WHERE "exerciseId" = $2`,
+          [newExerciseId, ex.id]
         );
       }
     }
 
     await client.query('COMMIT');
+    sendPushToUser(userId, { title: 'Novo treino disponível', body: `${template.name} foi atribuído a você.`, data: { type: 'workout_assigned', planId: newPlanId } });
     res.json({ success: true });
   } catch (err) {
     await client.query('ROLLBACK');
@@ -619,7 +711,7 @@ exports.assignDiet = async (req, res, next) => {
 
     if (!isAdmin) {
       const studentCheck = await client.query(`SELECT "instructorId" FROM "User" WHERE id = $1`, [userId]);
-      if (!studentCheck.rows[0] || studentCheck.rows[0].instructorId !== currentUserId) {
+      if (!studentCheck.rows[0] || (studentCheck.rows[0].instructorId !== currentUserId && userId !== currentUserId)) {
         return res.status(403).json({ success: false, message: 'Acesso negado' });
       }
     }
@@ -696,6 +788,7 @@ exports.assignDiet = async (req, res, next) => {
     }
 
     await client.query('COMMIT');
+    sendPushToUser(userId, { title: 'Nova dieta disponível', body: `${template.name} foi atribuída a você.`, data: { type: 'diet_assigned', planId: newPlanId } });
     res.json({ success: true });
   } catch (err) {
     await client.query('ROLLBACK');
@@ -712,7 +805,7 @@ exports.removeWorkout = async (req, res, next) => {
     const isAdmin = req.session.user.role === 'admin';
     if (!isAdmin) {
       const studentCheck = await global.db.query(`SELECT "instructorId" FROM "User" WHERE id = $1`, [userId]);
-      if (!studentCheck.rows[0] || studentCheck.rows[0].instructorId !== req.session.user.id) {
+      if (!studentCheck.rows[0] || (studentCheck.rows[0].instructorId !== req.session.user.id && userId !== req.session.user.id)) {
         return res.status(403).json({ success: false, message: 'Acesso negado' });
       }
     }
@@ -742,7 +835,7 @@ exports.removeDiet = async (req, res, next) => {
     const isAdmin = req.session.user.role === 'admin';
     if (!isAdmin) {
       const studentCheck = await global.db.query(`SELECT "instructorId" FROM "User" WHERE id = $1`, [userId]);
-      if (!studentCheck.rows[0] || studentCheck.rows[0].instructorId !== req.session.user.id) {
+      if (!studentCheck.rows[0] || (studentCheck.rows[0].instructorId !== req.session.user.id && userId !== req.session.user.id)) {
         return res.status(403).json({ success: false, message: 'Acesso negado' });
       }
     }
@@ -750,6 +843,45 @@ exports.removeDiet = async (req, res, next) => {
       `DELETE FROM "MealPlan" WHERE id = $1 AND "userId" = $2 AND "isTemplate" = false`,
       [planId, userId]
     );
+    res.json({ success: true });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.replySession = async (req, res, next) => {
+  try {
+    const sessionId = parseInt(req.params.id, 10);
+    const reply = (req.body.reply || '').trim();
+    const isAdmin = req.session.user.role === 'admin';
+    const currentUserId = req.session.user.id;
+
+    if (!reply) return res.status(400).json({ success: false, message: 'Escreva uma resposta' });
+    if (reply.length > 2000) return res.status(400).json({ success: false, message: 'Resposta muito longa (máx. 2000 caracteres)' });
+
+    const result = await global.db.query(
+      `SELECT ws.id, ws."userId", u."instructorId" FROM "WorkoutSession" ws
+       JOIN "User" u ON u.id = ws."userId"
+       WHERE ws.id = $1 AND ws."isCompleted" = true`,
+      [sessionId]
+    );
+    const session = result.rows[0];
+    if (!session) return res.status(404).json({ success: false, message: 'Treino não encontrado' });
+    if (!isAdmin && session.instructorId !== currentUserId) {
+      return res.status(403).json({ success: false, message: 'Acesso negado' });
+    }
+
+    await global.db.query(
+      `UPDATE "WorkoutSession" SET "instructorReply" = $1, "instructorReplyAt" = NOW() WHERE id = $2`,
+      [reply, sessionId]
+    );
+
+    sendPushToUser(session.userId, {
+      title: 'Seu instrutor respondeu',
+      body: reply.length > 120 ? reply.slice(0, 117) + '...' : reply,
+      data: { type: 'instructor_reply', sessionId },
+    });
+
     res.json({ success: true });
   } catch (err) {
     next(err);

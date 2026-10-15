@@ -120,6 +120,28 @@
 
     window.closeModal = closeModal;
 
+    window.askConfirm = function(message, title = 'Confirmar') {
+        return new Promise(function(resolve) {
+            const modal = document.getElementById('modal');
+            if (!modal) return resolve(window.confirm(message));
+            document.getElementById('modalTitle').textContent = title;
+            document.getElementById('modalMessage').textContent = message;
+            const replaceFresh = function(id) {
+                const old = document.getElementById(id);
+                const fresh = old.cloneNode(true);
+                old.parentNode.replaceChild(fresh, old);
+                return fresh;
+            };
+            const confirmBtn = replaceFresh('modalConfirm');
+            const cancelBtn = replaceFresh('modalCancel');
+            const finish = function(value) { closeModal(); resolve(value); };
+            confirmBtn.addEventListener('click', function() { finish(true); }, { once: true });
+            cancelBtn.addEventListener('click', function() { finish(false); }, { once: true });
+            modal.classList.add('show');
+        });
+    };
+
+
     // ========================
     // BUTTON EFFECTS
     // ========================

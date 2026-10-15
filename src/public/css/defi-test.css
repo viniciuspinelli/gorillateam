@@ -1,0 +1,582 @@
+/* Bitcoin DeFi — isolated test page (scoped under .defi-page) */
+
+.defi-page {
+    --void: #030304;
+    --surface: #0F1115;
+    --fg: #FFFFFF;
+    --muted: #94A3B8;
+    --border: #1E293B;
+    --orange: #F7931A;
+    --burnt: #EA580C;
+    --gold: #FFD600;
+    --ease: cubic-bezier(0.4, 0, 0.2, 1);
+
+    position: relative;
+    min-height: 100vh;
+    overflow-x: hidden;
+    background: var(--void);
+    color: var(--fg);
+    font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    -webkit-font-smoothing: antialiased;
+}
+
+.defi-page *, .defi-page *::before, .defi-page *::after {
+    box-sizing: border-box;
+}
+
+.defi-heading {
+    font-family: 'Space Grotesk', 'Inter', system-ui, sans-serif;
+}
+
+.defi-mono {
+    font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* ---------- Textured void ---------- */
+
+.defi-grid {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 620px;
+    pointer-events: none;
+    z-index: 0;
+    background-size: 50px 50px;
+    background-image:
+        linear-gradient(to right, rgba(30, 41, 59, 0.5) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(30, 41, 59, 0.5) 1px, transparent 1px);
+    -webkit-mask-image: radial-gradient(circle at center, black 40%, transparent 100%);
+    mask-image: radial-gradient(circle at center, black 40%, transparent 100%);
+}
+
+.defi-glow {
+    position: absolute;
+    border-radius: 9999px;
+    pointer-events: none;
+    z-index: 0;
+    filter: blur(120px);
+    background: var(--orange);
+    opacity: 0.1;
+}
+
+.defi-glow--top { top: -160px; left: 50%; width: 700px; height: 420px; margin-left: -350px; }
+.defi-glow--side { top: 40%; right: -180px; width: 420px; height: 420px; background: var(--gold); opacity: 0.06; }
+
+/* ---------- Layout ---------- */
+
+.defi-container {
+    position: relative;
+    z-index: 1;
+    max-width: 80rem;
+    margin: 0 auto;
+    padding: 32px 16px 96px;
+    display: flex;
+    flex-direction: column;
+    gap: 96px;
+}
+
+@media (min-width: 768px) {
+    .defi-container { padding: 64px 48px 128px; gap: 128px; }
+}
+
+.defi-section-title {
+    font-size: clamp(1.75rem, 4vw, 2.5rem);
+    font-weight: 700;
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+    margin: 0 0 32px;
+}
+
+.defi-label {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 12px;
+}
+
+.defi-gradient-text {
+    background: linear-gradient(to right, var(--orange), var(--gold));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
+
+/* ---------- Header ---------- */
+
+.defi-header {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 48px;
+    align-items: center;
+}
+
+@media (min-width: 1024px) {
+    .defi-header { grid-template-columns: 3fr 2fr; }
+}
+
+.defi-title {
+    font-size: clamp(2.5rem, 7vw, 4.5rem);
+    font-weight: 700;
+    line-height: 1.02;
+    letter-spacing: -0.03em;
+    margin: 0 0 24px;
+}
+
+.defi-lead {
+    margin: 0 0 32px;
+    max-width: 58ch;
+    font-size: 17px;
+    line-height: 1.7;
+    color: var(--muted);
+}
+
+.defi-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 16px;
+    border-radius: 9999px;
+    border: 1px solid rgba(247, 147, 26, 0.5);
+    background: rgba(247, 147, 26, 0.08);
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    color: var(--orange);
+}
+
+.defi-ping {
+    position: relative;
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 9999px;
+    background: var(--orange);
+}
+
+.defi-ping::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 9999px;
+    background: var(--orange);
+    animation: defi-ping 1.6s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+@keyframes defi-ping {
+    75%, 100% { transform: scale(2.4); opacity: 0; }
+}
+
+/* orbital ring graphic */
+.defi-orb {
+    position: relative;
+    width: 260px;
+    height: 260px;
+    margin: 0 auto;
+    animation: defi-float 8s ease-in-out infinite;
+}
+
+.defi-orb-core {
+    position: absolute;
+    inset: 50px;
+    border-radius: 9999px;
+    background: radial-gradient(circle at 35% 30%, var(--gold), var(--orange) 45%, var(--burnt));
+    box-shadow: 0 0 60px -10px rgba(247, 147, 26, 0.6);
+}
+
+.defi-ring {
+    position: absolute;
+    inset: 0;
+    border-radius: 9999px;
+    border: 1px solid rgba(247, 147, 26, 0.35);
+}
+
+.defi-ring--outer { animation: defi-spin 10s linear infinite; border-top-color: var(--orange); }
+.defi-ring--inner { inset: 24px; animation: defi-spin 15s linear infinite reverse; border-bottom-color: var(--gold); }
+
+@keyframes defi-spin { to { transform: rotate(360deg); } }
+@keyframes defi-float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-20px); }
+}
+
+/* ---------- Stats ---------- */
+
+.defi-stats {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+    padding: 24px 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+@media (min-width: 768px) {
+    .defi-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 24px; }
+}
+
+.defi-stat-value {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: clamp(1.75rem, 3.5vw, 2.5rem);
+    font-weight: 700;
+    color: var(--fg);
+    margin: 0;
+    font-variant-numeric: tabular-nums;
+}
+
+.defi-stat-label {
+    margin: 8px 0 0;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+}
+
+/* ---------- Buttons ---------- */
+
+.defi-btn {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 48px;
+    padding: 0 28px;
+    border: none;
+    border-radius: 9999px;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    transition: transform 300ms var(--ease), box-shadow 300ms var(--ease), background-color 300ms var(--ease), color 300ms var(--ease), border-color 300ms var(--ease);
+    -webkit-tap-highlight-color: transparent;
+}
+
+.defi-btn:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--void), 0 0 0 4px var(--orange);
+}
+
+.defi-btn:active { transform: scale(0.98); }
+
+/* dark text on orange: white on #F7931A would be ~2.3:1 */
+.defi-btn--primary {
+    background: linear-gradient(to right, var(--burnt), var(--orange));
+    color: var(--void);
+    box-shadow: 0 0 20px -5px rgba(234, 88, 12, 0.5);
+}
+
+.defi-btn--primary:hover {
+    transform: scale(1.05);
+    box-shadow: 0 0 30px -5px rgba(247, 147, 26, 0.6);
+}
+
+.defi-btn--outline {
+    background: transparent;
+    color: var(--fg);
+    border: 2px solid rgba(255, 255, 255, 0.2);
+}
+
+.defi-btn--outline:hover {
+    border-color: var(--fg);
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.defi-btn--ghost {
+    background: transparent;
+    color: var(--fg);
+}
+
+.defi-btn--ghost:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--orange);
+}
+
+.defi-btn--block { width: 100%; }
+
+.defi-btn-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    align-items: center;
+}
+
+.defi-link {
+    color: var(--orange);
+    font-size: 14px;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.defi-link:hover { text-decoration: underline; }
+
+@media (max-width: 560px) {
+    .defi-btn-row .defi-btn { width: 100%; }
+}
+
+/* ---------- Cards (blocks) ---------- */
+
+.defi-cards {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 24px;
+}
+
+@media (min-width: 768px) {
+    .defi-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32px; }
+}
+
+.defi-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    padding: 32px;
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: var(--surface);
+    overflow: hidden;
+    transition: transform 300ms var(--ease), border-color 300ms var(--ease), box-shadow 300ms var(--ease);
+}
+
+.defi-card:hover {
+    transform: translateY(-4px);
+    border-color: rgba(247, 147, 26, 0.5);
+    box-shadow: 0 0 30px -10px rgba(247, 147, 26, 0.2);
+}
+
+/* selected node: orange corner accents */
+.defi-card--selected::before,
+.defi-card--selected::after {
+    content: '';
+    position: absolute;
+    width: 28px;
+    height: 28px;
+    border-color: var(--orange);
+    border-style: solid;
+    pointer-events: none;
+}
+
+.defi-card--selected::before {
+    top: -1px;
+    left: -1px;
+    border-width: 2px 0 0 2px;
+    border-top-left-radius: 16px;
+}
+
+.defi-card--selected::after {
+    bottom: -1px;
+    right: -1px;
+    border-width: 0 2px 2px 0;
+    border-bottom-right-radius: 16px;
+}
+
+/* watermark icon revealed on hover */
+.defi-watermark {
+    position: absolute;
+    right: -16px;
+    top: -16px;
+    width: 140px;
+    height: 140px;
+    opacity: 0.08;
+    transition: opacity 300ms var(--ease), transform 300ms var(--ease);
+    pointer-events: none;
+}
+
+.defi-watermark svg {
+    width: 100%;
+    height: 100%;
+    stroke: var(--orange);
+    fill: none;
+    stroke-width: 1;
+}
+
+.defi-card:hover .defi-watermark {
+    opacity: 0.25;
+    transform: rotate(12deg);
+}
+
+.defi-node {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    background: rgba(234, 88, 12, 0.2);
+    border: 1px solid rgba(234, 88, 12, 0.5);
+    color: var(--orange);
+    transition: box-shadow 300ms var(--ease);
+}
+
+.defi-node svg {
+    width: 22px;
+    height: 22px;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 1.8;
+}
+
+.defi-card:hover .defi-node {
+    box-shadow: 0 0 20px rgba(234, 88, 12, 0.4);
+}
+
+.defi-card-title {
+    margin: 0;
+    font-family: 'Space Grotesk', 'Inter', system-ui, sans-serif;
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+}
+
+.defi-card-text {
+    margin: 0;
+    font-size: 15px;
+    line-height: 1.6;
+    color: var(--muted);
+}
+
+.defi-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-top: auto;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 12px;
+    color: var(--muted);
+}
+
+.defi-meta strong {
+    color: var(--gold);
+    font-weight: 500;
+}
+
+.defi-glass {
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+}
+
+/* ---------- Inputs (terminal style, bottom border) ---------- */
+
+.defi-form {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 28px;
+    padding: 32px;
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: var(--surface);
+}
+
+@media (min-width: 768px) {
+    .defi-form { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+.defi-field {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.defi-input-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--muted);
+}
+
+.defi-input {
+    width: 100%;
+    height: 48px;
+    padding: 8px 16px;
+    border: none;
+    border-bottom: 2px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px 8px 0 0;
+    background: rgba(0, 0, 0, 0.5);
+    color: var(--fg);
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 14px;
+    transition: border-color 200ms var(--ease), box-shadow 200ms var(--ease);
+}
+
+.defi-input::placeholder {
+    color: rgba(255, 255, 255, 0.3);
+}
+
+.defi-input:focus-visible {
+    outline: none;
+    border-bottom-color: var(--orange);
+    box-shadow: 0 10px 20px -10px rgba(247, 147, 26, 0.3);
+}
+
+/* ---------- Timeline (blockchain ledger) ---------- */
+
+.defi-timeline {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 40px;
+    padding-left: 56px;
+}
+
+.defi-timeline::before {
+    content: '';
+    position: absolute;
+    left: 19px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: linear-gradient(to bottom, var(--orange), transparent);
+}
+
+.defi-step {
+    position: relative;
+}
+
+.defi-step-node {
+    position: absolute;
+    left: -56px;
+    top: 0;
+    width: 40px;
+    height: 40px;
+    border-radius: 9999px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--void);
+    border: 2px solid var(--orange);
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--orange);
+    box-shadow: 0 0 20px -5px rgba(247, 147, 26, 0.6);
+}
+
+.defi-step-title {
+    margin: 0 0 6px;
+    font-family: 'Space Grotesk', 'Inter', system-ui, sans-serif;
+    font-size: 19px;
+    font-weight: 600;
+}
+
+.defi-step-text {
+    margin: 0;
+    font-size: 15px;
+    line-height: 1.6;
+    color: var(--muted);
+}
+
+/* ---------- Reduced motion ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+    .defi-page *, .defi-page *::before, .defi-page *::after {
+        animation: none !important;
+        transition: none !important;
+    }
+}

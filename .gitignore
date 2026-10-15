@@ -7,6 +7,12 @@ yarn.lock
 .env.local
 .env.*.local
 
+# MCP server config (contains DB connection string)
+.mcp.json
+
+# Playwright MCP session output (screenshots, snapshots, console logs)
+.playwright-mcp/
+
 # IDE
 .vscode/
 .idea/
@@ -26,3 +32,6 @@ build/
 logs/
 *.log
 npm-debug.log*
+
+# Claude Code local lock
+.claude/scheduled_tasks.lock

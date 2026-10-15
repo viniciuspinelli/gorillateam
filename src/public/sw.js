@@ -3,7 +3,7 @@
  * Enables basic PWA capabilities
  */
 
-const CACHE_NAME = 'gymdiet-v2';
+const CACHE_NAME = 'gorillateam-v1';
 const STATIC_ASSETS = [
     '/css/style.css',
     '/js/utils.js',

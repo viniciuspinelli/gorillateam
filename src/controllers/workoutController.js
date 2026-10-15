@@ -1,5 +1,6 @@
 // Workout Controller - Using global.db (pg Pool)
 const { getStorageProvider } = require('../services/storage');
+const { sendPushToUser } = require('../services/pushNotifications');
 
 const storageProvider = getStorageProvider();
 
@@ -24,7 +25,7 @@ exports.getWorkouts = async (req, res, next) => {
 
     // Get all active workout programs for this user
     const plansResult = await global.db.query(
-      'SELECT id, name, description, "isActive", "order", "dayOfWeek" FROM "WorkoutPlan" WHERE "isActive" = true AND "userId" = $1 AND "isTemplate" = false ORDER BY "order" ASC',
+      'SELECT id, name, description, "isActive", "order", "dayOfWeek", "expiresAt" FROM "WorkoutPlan" WHERE "isActive" = true AND "userId" = $1 AND "isTemplate" = false ORDER BY "order" ASC',
       [userId]
     );
 
@@ -33,6 +34,19 @@ exports.getWorkouts = async (req, res, next) => {
       'SELECT COUNT(*) as count FROM "WorkoutSession" WHERE "userId" = $1 AND "isCompleted" = true',
       [userId]
     );
+
+    // Get in-progress sessions so the current workout can be pinned above the rest
+    const activeSessionsResult = await global.db.query(
+      `SELECT ws.id, ws."workoutGroupId", ws."startedAt", wg.name AS "groupName", wp.name AS "planName"
+       FROM "WorkoutSession" ws
+       JOIN "WorkoutGroup" wg ON wg.id = ws."workoutGroupId"
+       JOIN "WorkoutPlan" wp ON wp.id = ws."workoutPlanId"
+       WHERE ws."userId" = $1 AND ws."isCompleted" = false
+       ORDER BY ws."startedAt" DESC`,
+      [userId]
+    );
+    const activeSessions = activeSessionsResult.rows;
+    const activeSessionByGroupId = new Map(activeSessions.map((s) => [s.workoutGroupId, s.id]));
 
     // Get muscle groups (with their exercises) for each program
     const plans = await Promise.all(plansResult.rows.map(async (plan) => {
@@ -46,11 +60,40 @@ exports.getWorkouts = async (req, res, next) => {
           'SELECT id, name, sets, reps, weight, "restSeconds", notes, "order" FROM "Exercise" WHERE "workoutGroupId" = $1 ORDER BY "order" ASC',
           [group.id]
         );
+
+        const exerciseIds = exercisesResult.rows.map((ex) => ex.id);
+        let imagesByExerciseId = new Map();
+        if (exerciseIds.length > 0) {
+          const imagesResult = await global.db.query(
+            `SELECT id, "exerciseId", "publicUrl", "fileName"
+             FROM "WorkoutExerciseImage"
+             WHERE "exerciseId" = ANY($1::int[])
+             ORDER BY "sortOrder" ASC, id ASC`,
+            [exerciseIds]
+          );
+          imagesByExerciseId = imagesResult.rows.reduce((map, image) => {
+            if (!map.has(image.exerciseId)) map.set(image.exerciseId, []);
+            map.get(image.exerciseId).push(image);
+            return map;
+          }, new Map());
+        }
+        const exercises = exercisesResult.rows.map((ex) => ({
+          ...ex,
+          images: imagesByExerciseId.get(ex.id) || [],
+        }));
+
         const groupSessionsResult = await global.db.query(
           'SELECT id FROM "WorkoutSession" WHERE "userId" = $1 AND "workoutGroupId" = $2 AND "isCompleted" = true',
           [userId, group.id]
         );
-        return { ...group, exercises: exercisesResult.rows, sessions: groupSessionsResult.rows };
+        const totalSets = exercises.reduce((sum, ex) => sum + (ex.sets || 0), 0);
+        return {
+          ...group,
+          exercises,
+          sessions: groupSessionsResult.rows,
+          totalSets,
+          activeSessionId: activeSessionByGroupId.get(group.id) || null,
+        };
       }));
 
       return { ...plan, groups };
@@ -62,6 +105,7 @@ exports.getWorkouts = async (req, res, next) => {
       title: 'Treinos',
       plans,
       totalSessions,
+      activeSessions,
       csrfToken: req.csrfToken(),
     });
   } catch (error) {
@@ -169,7 +213,7 @@ exports.getActiveWorkout = async (req, res, next) => {
 
     // Get session exercises with details
     const exercisesResult = await global.db.query(
-      `SELECT se.id, se."exerciseId", se."isCompleted", se."completedAt",
+      `SELECT se.id, se."exerciseId", se."isCompleted", se."completedAt", se."actualWeight", se."actualReps",
               e.name, e.sets, e.reps, e.weight, e."restSeconds", e.notes
        FROM "SessionExercise" se
        JOIN "Exercise" e ON se."exerciseId" = e.id
@@ -199,11 +243,28 @@ exports.getActiveWorkout = async (req, res, next) => {
       }, new Map());
     }
 
+    const lastUsedResult = exerciseIds.length > 0
+      ? await global.db.query(
+          `SELECT DISTINCT ON (se."exerciseId") se."exerciseId", se."actualWeight", se."actualReps"
+           FROM "SessionExercise" se
+           JOIN "WorkoutSession" ws ON ws.id = se."workoutSessionId"
+           WHERE ws."userId" = $1 AND ws."isCompleted" = true AND ws.id <> $2
+             AND se."exerciseId" = ANY($3::int[]) AND se."actualWeight" IS NOT NULL
+           ORDER BY se."exerciseId", ws."completedAt" DESC`,
+          [userId, parseInt(sessionId), exerciseIds]
+        )
+      : { rows: [] };
+    const lastUsedByExerciseId = new Map(lastUsedResult.rows.map((row) => [row.exerciseId, row]));
+
     session.sessionExercises = exercisesResult.rows.map(row => ({
       id: row.id,
       exerciseId: row.exerciseId,
       isCompleted: row.isCompleted,
       completedAt: row.completedAt,
+      actualWeight: row.actualWeight,
+      actualReps: row.actualReps,
+      lastWeight: lastUsedByExerciseId.get(row.exerciseId)?.actualWeight || null,
+      lastReps: lastUsedByExerciseId.get(row.exerciseId)?.actualReps || null,
       exercise: {
         name: row.name,
         sets: row.sets,
@@ -238,16 +299,17 @@ exports.completeExercise = async (req, res, next) => {
   try {
     const { sessionId, exerciseId } = req.params;
     const userId = req.session.user.id;
+    const { actualWeight, actualReps } = req.body || {};
 
     // Update session exercise, scoped to a session that actually belongs to this user
     const updateResult = await global.db.query(
       `UPDATE "SessionExercise" se
-       SET "isCompleted" = true, "completedAt" = NOW()
+       SET "isCompleted" = true, "completedAt" = NOW(), "actualWeight" = $4, "actualReps" = $5
        FROM "WorkoutSession" ws
        WHERE se.id = $1 AND se."workoutSessionId" = $2
          AND ws.id = se."workoutSessionId" AND ws."userId" = $3
        RETURNING se.*`,
-      [parseInt(exerciseId), parseInt(sessionId), userId]
+      [parseInt(exerciseId), parseInt(sessionId), userId, actualWeight?.trim() || null, actualReps?.trim() || null]
     );
 
     if (updateResult.rows.length === 0) {
@@ -268,7 +330,7 @@ exports.completeWorkout = async (req, res, next) => {
   try {
     const { sessionId } = req.params;
     const userId = req.session.user.id;
-    const { durationMin } = req.body;
+    const { durationMin, notes } = req.body;
 
     // Verify session belongs to user
     const sessionResult = await global.db.query(
@@ -283,11 +345,23 @@ exports.completeWorkout = async (req, res, next) => {
     // Update session
     const updateResult = await global.db.query(
       `UPDATE "WorkoutSession"
-       SET "isCompleted" = true, "completedAt" = NOW(), "durationMin" = $1
-       WHERE id = $2
+       SET "isCompleted" = true, "completedAt" = NOW(), "durationMin" = $1, "notes" = $2
+       WHERE id = $3
        RETURNING *`,
-      [parseInt(durationMin) || 0, parseInt(sessionId)]
+      [parseInt(durationMin) || 0, notes?.trim() || null, parseInt(sessionId)]
     );
+
+    if (notes?.trim()) {
+      const instructorResult = await global.db.query('SELECT "instructorId", "fullName", username FROM "User" WHERE id = $1', [userId]);
+      const student = instructorResult.rows[0];
+      if (student?.instructorId) {
+        sendPushToUser(student.instructorId, {
+          title: 'Novo feedback de treino',
+          body: `${student.fullName || student.username} comentou sobre o treino de hoje.`,
+          data: { type: 'workout_feedback', studentId: userId },
+        });
+      }
+    }
 
     res.json({ success: true, session: updateResult.rows[0] });
   } catch (error) {
@@ -305,7 +379,7 @@ exports.getHistory = async (req, res, next) => {
 
     // Get completed sessions
     const sessionsResult = await global.db.query(
-      `SELECT ws.id, ws."workoutPlanId", ws."startedAt", ws."completedAt", ws."durationMin", ws."notes",
+      `SELECT ws.id, ws."workoutPlanId", ws."startedAt", ws."completedAt", ws."durationMin", ws."notes", ws."instructorReply",
               wp.name as plan_name, wg.name as group_name
        FROM "WorkoutSession" ws
        JOIN "WorkoutPlan" wp ON ws."workoutPlanId" = wp.id
@@ -319,7 +393,9 @@ exports.getHistory = async (req, res, next) => {
     const sessions = await Promise.all(
       sessionsResult.rows.map(async (row) => {
         const exercisesResult = await global.db.query(
-          `SELECT id, "isCompleted" FROM "SessionExercise" WHERE "workoutSessionId" = $1`,
+          `SELECT se.id, se."isCompleted", se."actualWeight", se."actualReps", e.name, e.sets, e.reps
+           FROM "SessionExercise" se JOIN "Exercise" e ON se."exerciseId" = e.id
+           WHERE se."workoutSessionId" = $1 ORDER BY e."order" ASC`,
           [row.id]
         );
         
@@ -330,6 +406,7 @@ exports.getHistory = async (req, res, next) => {
           completedAt: row.completedAt,
           durationMin: row.durationMin,
           notes: row.notes,
+          instructorReply: row.instructorReply,
           workoutPlan: { name: row.plan_name },
           groupName: row.group_name,
           sessionExercises: exercisesResult.rows
@@ -420,7 +497,7 @@ exports.getWorkoutPlans = async (req, res, next) => {
 
     const plans = await Promise.all(plansResult.rows.map(async (plan) => {
       const groupsResult = await global.db.query(`
-        SELECT wg.id, wg.name, wg."order", COUNT(e.id) AS exercise_count
+        SELECT wg.id, wg.name, wg."order", COUNT(e.id) AS exercise_count, COALESCE(SUM(e.sets), 0) AS total_sets
         FROM "WorkoutGroup" wg
         LEFT JOIN "Exercise" e ON e."workoutGroupId" = wg.id
         WHERE wg."workoutPlanId" = $1
@@ -428,7 +505,11 @@ exports.getWorkoutPlans = async (req, res, next) => {
         ORDER BY wg."order" ASC
       `, [plan.id]);
 
-      const groups = groupsResult.rows.map(g => ({ ...g, exercise_count: parseInt(g.exercise_count, 10) }));
+      const groups = groupsResult.rows.map(g => ({
+        ...g,
+        exercise_count: parseInt(g.exercise_count, 10),
+        total_sets: parseInt(g.total_sets, 10),
+      }));
       const exercise_count = groups.reduce((sum, g) => sum + g.exercise_count, 0);
 
       return { ...plan, groups, exercise_count };

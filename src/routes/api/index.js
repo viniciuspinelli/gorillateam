@@ -7,6 +7,7 @@ const shoppingApiController = require('../../controllers/api/shoppingApiControll
 const profileApiController = require('../../controllers/api/profileApiController');
 const adminApiController = require('../../controllers/api/adminApiController');
 const templatesApiController = require('../../controllers/api/templatesApiController');
+const pushApiController = require('../../controllers/api/pushApiController');
 const apiAuthMiddleware = require('../../middleware/apiAuthMiddleware');
 const apiAdminMiddleware = require('../../middleware/apiAdminMiddleware');
 const { exerciseImageUpload } = require('../../middleware/uploadMiddleware');
@@ -56,6 +57,9 @@ router.post('/shopping/import-from-diet', apiAuthMiddleware, shoppingApiControll
 
 router.get('/profile', apiAuthMiddleware, profileApiController.getProfile);
 
+router.post('/push/register', apiAuthMiddleware, pushApiController.registerToken);
+router.post('/push/unregister', apiAuthMiddleware, pushApiController.unregisterToken);
+
 // ========================
 // ADMIN / INSTRUCTOR (requerem token JWT + role admin/instructor)
 // ========================
@@ -89,6 +93,7 @@ router.post('/workouts/plans', apiAuthMiddleware, apiAdminMiddleware, workoutApi
 router.delete('/workouts/plans/:planId', apiAuthMiddleware, apiAdminMiddleware, workoutApiController.deleteWorkoutPlan);
 router.patch('/workouts/plans/:planId/toggle-template', apiAuthMiddleware, apiAdminMiddleware, workoutApiController.toggleTemplate);
 router.put('/workouts/plans/:planId', apiAuthMiddleware, apiAdminMiddleware, workoutApiController.updateWorkoutPlan);
+router.get('/workouts/plans/:planId/groups', apiAuthMiddleware, apiAdminMiddleware, workoutApiController.getWorkoutGroups);
 router.post('/workouts/plans/:planId/groups', apiAuthMiddleware, apiAdminMiddleware, workoutApiController.createWorkoutGroup);
 router.put('/workouts/groups/:groupId', apiAuthMiddleware, apiAdminMiddleware, workoutApiController.updateWorkoutGroup);
 router.delete('/workouts/groups/:groupId', apiAuthMiddleware, apiAdminMiddleware, workoutApiController.deleteWorkoutGroup);

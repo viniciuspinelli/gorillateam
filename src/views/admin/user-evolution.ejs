@@ -1,0 +1,165 @@
+<div class="admin-page">
+    <a href="/admin/users" class="btn-back" style="margin-bottom:16px;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+        Voltar
+    </a>
+
+    <div style="display:flex; align-items:center; gap:16px; padding-bottom:20px; margin-bottom:24px; border-bottom:1px solid var(--border-subtle);">
+        <span class="admin-user-avatar lg"><%= (targetUser.fullName || targetUser.username).charAt(0).toUpperCase() %></span>
+        <div>
+            <div style="display:flex; align-items:baseline; gap:10px; flex-wrap:wrap;">
+                <span style="font-size:20px; font-weight:700; color:var(--text-primary);"><%= targetUser.fullName || targetUser.username %></span>
+                <% if (targetUser.fullName) { %><span style="font-size:13px; color:var(--text-tertiary);">@<%= targetUser.username %></span><% } %>
+            </div>
+        </div>
+    </div>
+
+    <div class="detail-tabs">
+        <a href="/admin/users/<%= targetUser.id %>" class="detail-tab">Planos</a>
+        <a href="/admin/users/<%= targetUser.id %>/evolution" class="detail-tab active">Evolução</a>
+    </div>
+
+    <!-- WEIGHT SECTION -->
+    <div class="admin-detail-section" style="margin-bottom:20px;">
+        <div class="section-card-header">
+            <div class="section-card-title">
+                <span class="section-icon-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></span>
+                <h2>Peso Corporal</h2>
+            </div>
+        </div>
+        <% if (weightLogs.length > 0) { %>
+            <div class="weight-chart-container">
+                <canvas id="weightChart"></canvas>
+            </div>
+        <% } else { %>
+            <div class="section-empty">
+                <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+                <p>O aluno ainda não registrou nenhum peso.</p>
+            </div>
+        <% } %>
+    </div>
+
+    <!-- PHOTOS SECTION -->
+    <div class="admin-detail-section" style="margin-bottom:20px;">
+        <div class="section-card-header">
+            <div class="section-card-title">
+                <span class="section-icon-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></span>
+                <h2>Fotos de Progresso</h2>
+            </div>
+        </div>
+        <% if (photos.length > 0) { %>
+            <div class="photo-grid">
+                <% photos.forEach(p => { %>
+                    <div class="photo-grid-item">
+                        <img src="<%= p.publicUrl %>" alt="Foto de progresso" loading="lazy">
+                        <div class="photo-grid-caption">
+                            <span><%= new Date(p.takenAt + 'T00:00:00').toLocaleDateString('pt-BR') %></span>
+                        </div>
+                    </div>
+                <% }); %>
+            </div>
+        <% } else { %>
+            <div class="section-empty">
+                <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                <p>Nenhuma foto enviada ainda.</p>
+            </div>
+        <% } %>
+    </div>
+
+    <!-- WORKOUT HISTORY SECTION -->
+    <div class="admin-detail-section">
+        <div class="section-card-header">
+            <div class="section-card-title">
+                <span class="section-icon-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></span>
+                <h2>Histórico de Treinos</h2>
+            </div>
+        </div>
+
+        <% if (workoutSessions.length > 0) { %>
+            <div class="evolution-list">
+                <% workoutSessions.forEach(session => { %>
+                    <div class="evolution-row">
+                        <button type="button" class="evolution-row-toggle" data-session-id="<%= session.id %>">
+                            <span class="evolution-row-date"><%= new Date(session.completedAt).toLocaleDateString('pt-BR') %></span>
+                            <span class="evolution-row-plan"><%= session.groupName || session.planName %></span>
+                            <span class="evolution-row-meta"><%= session.durationMin ? session.durationMin + ' min' : 'N/A' %> · <%= session.sessionExercises.length %> exerc.<%= session.notes ? ' · 💬' : '' %></span>
+                            <svg class="evolution-row-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                        </button>
+                        <div class="evolution-row-detail" id="sessionDetail-<%= session.id %>" style="display:none;">
+                            <% if (session.notes) { %>
+                                <div class="session-notes" style="margin-bottom:10px;">
+                                    <strong>Feedback do aluno:</strong> <%= session.notes %>
+                                </div>
+                            <% } %>
+                            <% if (session.notes) { %>
+                                <div class="instructor-reply" data-session-id="<%= session.id %>">
+                                    <% if (session.instructorReply) { %>
+                                        <p class="instructor-reply-text"><strong>Sua resposta:</strong> <%= session.instructorReply %></p>
+                                    <% } %>
+                                    <label class="instructor-reply-label" for="reply-<%= session.id %>"><%= session.instructorReply ? 'Editar resposta' : 'Responder ao aluno' %></label>
+                                    <textarea id="reply-<%= session.id %>" class="instructor-reply-input" rows="2" maxlength="2000" placeholder="Ex: ótimo! Na próxima aumente 2kg no supino."></textarea>
+                                    <button type="button" class="btn btn-primary btn-sm instructor-reply-send" data-session-id="<%= session.id %>">Enviar resposta</button>
+                                </div>
+                            <% } %>
+                            <% session.sessionExercises.forEach(se => { %>
+                                <div class="session-detail-row">
+                                    <span class="ex-name"><%= se.name %></span>
+                                    <span class="ex-planned"><%= formatSetsReps(se.sets, se.reps) %></span>
+                                    <% if (se.actualWeight || se.actualReps) { %>
+                                        <span class="ex-actual"><%= [se.actualWeight, se.actualReps].filter(Boolean).join(' · ') %></span>
+                                    <% } %>
+                                </div>
+                            <% }); %>
+                        </div>
+                    </div>
+                <% }); %>
+            </div>
+        <% } else { %>
+            <div class="section-empty">
+                <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                <p>Nenhum treino concluído ainda.</p>
+                <p class="section-empty-hint">O histórico aparece aqui assim que o aluno finalizar um treino.</p>
+            </div>
+        <% } %>
+    </div>
+</div>
+
+<script src="/vendor/chart.min.js"></script>
+<script src="/js/weightChart.js"></script>
+<script nonce="<%= nonce %>">
+    renderWeightChart('weightChart', <%- JSON.stringify(weightLogs) %>);
+
+    document.querySelectorAll('.instructor-reply-send').forEach(function (btn) {
+        btn.addEventListener('click', async function () {
+            const sessionId = this.dataset.sessionId;
+            const textarea = document.getElementById('reply-' + sessionId);
+            const reply = textarea.value.trim();
+            if (!reply) return showToast('Escreva uma resposta', 'error');
+            this.disabled = true;
+            try {
+                const res = await fetch('/admin/sessions/' + sessionId + '/reply', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').content },
+                    body: JSON.stringify({ reply: reply })
+                });
+                const data = await res.json();
+                if (data.success) { showToast('Resposta enviada ao aluno!', 'success'); setTimeout(() => location.reload(), 600); }
+                else showToast(data.message || 'Erro', 'error');
+            } catch (err) {
+                showToast('Erro de conexão', 'error');
+            } finally {
+                this.disabled = false;
+            }
+        });
+    });
+
+    document.querySelectorAll('.evolution-row-toggle').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const detail = document.getElementById(`sessionDetail-${btn.dataset.sessionId}`);
+            if (!detail) return;
+            const isHidden = detail.style.display === 'none';
+            detail.style.display = isHidden ? 'block' : 'none';
+            btn.classList.toggle('expanded', isHidden);
+        });
+    });
+</script>

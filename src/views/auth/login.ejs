@@ -1,9 +1,11 @@
 <div class="login-page">
     <div class="login-card">
         <div class="login-logo">
-            <img src="/logo.png" alt="GymDiet" class="login-logo-img">
+            <img src="/brand/mascot.png" alt="" class="login-mascot">
+            <img src="/brand/wordmark.png" alt="Gorilla.Team" class="login-logo-img">
+            <p class="brand-tagline">Mais que atletas, <span>uma família.</span></p>
         </div>
-        <p class="login-subtitle">Seu Assistente de Treinos e Dieta</p>
+        <p class="login-subtitle">Treino, dieta e evolução do time</p>
 
         <% if (typeof error !== 'undefined' && error) { %>
             <div class="login-alert">
@@ -22,6 +24,9 @@
                     id="username"
                     name="username"
                     placeholder="admin"
+                    autocapitalize="none"
+                    autocorrect="off"
+                    spellcheck="false"
                     required
                     autofocus
                 >
@@ -47,6 +52,17 @@
         <p class="login-hint"><a href="/auth/forgot-password" style="color: var(--text-tertiary); font-size:12px;">Esqueci minha senha</a></p>
     </div>
 </div>
+
+<script nonce="<%= nonce %>">
+    document.querySelector('.login-form')?.addEventListener('submit', function () {
+        const btn = this.querySelector('button[type="submit"]');
+        if (btn) {
+            // Avoid a double tap on mobile firing two submits with the same
+            // (about to be invalidated) CSRF token.
+            setTimeout(() => { btn.disabled = true; }, 0);
+        }
+    });
+</script>
 
 <style>
     body {
@@ -149,7 +165,7 @@
         border-radius: var(--radius-sm);
         color: var(--text-primary);
         font-size: 14px;
-        font-family: 'Inter', sans-serif;
+        font-family: 'Barlow', sans-serif;
         transition: border-color 140ms ease, box-shadow 140ms ease;
         outline: none;
     }

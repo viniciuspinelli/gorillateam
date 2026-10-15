@@ -20,7 +20,7 @@
                 <% }); %>
             </select>
             <% if (typeof isAdmin !== 'undefined' && isAdmin) { %>
-            <button class="btn btn-success" onclick="createNewPlan()">
+            <button class="btn btn-primary" onclick="createNewPlan()">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                 Novo Plano
             </button>
@@ -94,7 +94,7 @@
                     </div>
                 </div>
                 <div class="form-actions">
-                    <button type="submit" class="btn btn-success">
+                    <button type="submit" class="btn btn-primary">
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
                         Criar Refeição
                     </button>
@@ -124,7 +124,7 @@
                             </div>
                             <div class="meal-header-actions">
                                 <% if (typeof isAdmin !== 'undefined' && isAdmin) { %>
-                                <button class="btn btn-success btn-sm" onclick="toggleAddFoodForm(<%= meal.id %>)">
+                                <button class="btn btn-primary btn-sm" onclick="toggleAddFoodForm(<%= meal.id %>)">
                                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                                     Alimento
                                 </button>
@@ -259,7 +259,7 @@
                                     <input type="text" class="food-notes-input" placeholder="ex: Sem pele, cozido...">
                                 </div>
                                 <div class="form-actions">
-                                    <button type="submit" class="btn btn-success btn-sm">
+                                    <button type="submit" class="btn btn-primary btn-sm">
                                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
                                         Adicionar
                                     </button>
@@ -469,7 +469,7 @@
 .form-group select:focus {
     outline: none;
     border-color: var(--accent-primary);
-    box-shadow: 0 0 0 3px var(--border-focus, rgba(249, 115, 22, 0.15));
+    box-shadow: 0 0 0 3px var(--border-focus, rgba(242, 74, 0, 0.15));
 }
 
 .form-actions {
@@ -1041,8 +1041,8 @@
         }
     }
 
-    function deleteMeal(mealId) {
-        if (confirm('Deletar essa refeição? Todos os alimentos serão removidos.')) {
+    async function deleteMeal(mealId) {
+        if (await askConfirm('Deletar essa refeição? Todos os alimentos serão removidos.')) {
             try {
                 fetch(`/diet/meals/${mealId}`, {
                     method: 'DELETE',
@@ -1073,8 +1073,8 @@
         }
     }
 
-    function deleteFood(foodId) {
-        if (confirm('Deletar esse alimento?')) {
+    async function deleteFood(foodId) {
+        if (await askConfirm('Deletar esse alimento?')) {
             try {
                 fetch(`/diet/foods/${foodId}`, {
                     method: 'DELETE',
@@ -1249,7 +1249,7 @@
     }
 
     async function deleteFoodOption(optionId) {
-        if (!confirm('Remover este substituto?')) return;
+        if (!(await askConfirm('Remover este substituto?'))) return;
         try {
             const res = await fetch(`/diet/food-options/${optionId}`, {
                 method: 'DELETE',

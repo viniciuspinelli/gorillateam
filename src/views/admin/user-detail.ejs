@@ -21,10 +21,17 @@
                 </span>
             </div>
         </div>
+        <% if (user.role === 'admin' || targetUser.id !== user.id) { %>
         <a href="/admin/users/<%= targetUser.id %>/edit" class="btn btn-secondary">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
             Editar
         </a>
+        <% } %>
+    </div>
+
+    <div class="detail-tabs">
+        <a href="/admin/users/<%= targetUser.id %>" class="detail-tab active">Planos</a>
+        <a href="/admin/users/<%= targetUser.id %>/evolution" class="detail-tab">Evolução</a>
     </div>
 
     <div class="admin-detail-grid">
@@ -52,6 +59,8 @@
                         <option value="<%= t.id %>"><%= t.name %><%= t.dayOfWeek ? ' (' + t.dayOfWeek + ')' : '' %></option>
                     <% }); %>
                 </select>
+                <span class="assign-panel-label">Validade do treino (padrão: 3 meses)</span>
+                <input type="date" id="workoutExpiresAt">
                 <div class="assign-panel-actions">
                     <button class="btn btn-primary btn-sm" onclick="assignWorkout()">Atribuir</button>
                     <button class="btn btn-secondary btn-sm" onclick="togglePanel('assign-workout')">Cancelar</button>
@@ -61,10 +70,21 @@
             <% if (workouts.length > 0) { %>
                 <div class="assigned-plans-list">
                     <% workouts.forEach(w => { %>
+                        <%
+                            let expiryClass = '';
+                            let expiryLabel = '';
+                            if (w.expiresAt) {
+                                const daysLeft = Math.ceil((new Date(w.expiresAt) - Date.now()) / 86400000);
+                                if (daysLeft < 0) { expiryClass = 'plan-badge-danger'; expiryLabel = 'Expirado'; }
+                                else if (daysLeft <= 14) { expiryClass = 'plan-badge-warning'; expiryLabel = `Expira em ${daysLeft}d`; }
+                                else { expiryLabel = 'Válido até ' + new Date(w.expiresAt).toLocaleDateString('pt-BR'); }
+                            }
+                        %>
                         <div class="assigned-plan-row">
                             <div class="assigned-plan-info">
                                 <span class="assigned-plan-name"><%= w.name %></span>
                                 <% if (w.dayOfWeek) { %><span class="plan-badge"><%= w.dayOfWeek %></span><% } %>
+                                <% if (expiryLabel) { %><span class="plan-badge <%= expiryClass %>"><%= expiryLabel %></span><% } %>
                             </div>
                             <button class="btn btn-sm btn-danger" onclick="removePlan('workout', <%= w.id %>)" title="Remover" aria-label="Remover treino">
                                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
@@ -149,16 +169,26 @@ const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
 
 function togglePanel(id) {
     const el = document.getElementById(id);
-    el.style.display = el.style.display === 'none' ? 'block' : 'none';
+    const opening = el.style.display === 'none';
+    el.style.display = opening ? 'block' : 'none';
+    if (opening && id === 'assign-workout') {
+        const expiresInput = document.getElementById('workoutExpiresAt');
+        if (expiresInput && !expiresInput.value) {
+            const defaultExpiry = new Date();
+            defaultExpiry.setMonth(defaultExpiry.getMonth() + 3);
+            expiresInput.value = defaultExpiry.toISOString().slice(0, 10);
+        }
+    }
 }
 
 async function assignWorkout() {
     const templateId = document.getElementById('workoutTemplateSelect').value;
     if (!templateId) return showToast('Selecione um template', 'error');
+    const expiresAt = document.getElementById('workoutExpiresAt').value || null;
     const res = await fetch(`/admin/users/${userId}/assign-workout`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
-        body: JSON.stringify({ templateId })
+        body: JSON.stringify({ templateId, expiresAt })
     });
     const data = await res.json();
     if (data.success) { showToast('Treino atribuído!', 'success'); setTimeout(() => location.reload(), 800); }
@@ -179,7 +209,7 @@ async function assignDiet() {
 }
 
 async function removePlan(type, planId) {
-    if (!confirm('Remover este plano do aluno?')) return;
+    if (!(await askConfirm('Remover este plano do aluno?'))) return;
     const url = type === 'workout'
         ? `/admin/users/${userId}/workouts/${planId}`
         : `/admin/users/${userId}/diets/${planId}`;

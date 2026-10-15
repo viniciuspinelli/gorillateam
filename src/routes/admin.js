@@ -14,6 +14,8 @@ router.get('/users/:id/edit', adminController.getEditUser);
 router.post('/users/:id/edit', adminController.postEditUser);
 router.delete('/users/:id', adminController.deleteUser);
 router.get('/users/:id', adminController.getUserDetail);
+router.get('/users/:id/evolution', adminController.getUserEvolution);
+router.post('/sessions/:id/reply', adminController.replySession);
 
 // Assign / remove plans from users
 router.post('/users/:id/assign-workout', adminController.assignWorkout);
